@@ -5,6 +5,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 import argparse as arg
+import os
 import logging
 import globals
 
@@ -32,7 +33,19 @@ def argument_parse_gradunwarp():
                   default=False)
     p.add_argument('--verbose', action='store_true', default=False)
 
-    return p.parse_args()
+    args = p.parse_args()
+
+    # do some validation
+    if not os.path.exists(args.infile):
+        raise IOError(args.infile + ' not found')
+    if not os.path.exists(args.outfile):
+        raise IOError(args.outfile + ' not found')
+    if args.gradfile:
+        if not os.path.exists(args.gradfile):
+            raise IOError(args.gradfile + ' not found')
+    if args.coeffile:
+        if not os.path.exists(args.coeffile):
+            raise IOError(args.coeffile + ' not found')
 
 
 class GradientUnwarpRunner(object):
@@ -49,6 +62,15 @@ class GradientUnwarpRunner(object):
         log.setLevel(logging.INFO)
         if hasattr(self.args, 'verbose'):
             log.setLevel(logging.DEBUG)
+
+        # get the spherical harmonics coefficients from parsing
+        # the given .coeff file xor .grad file
+        if hasattr(self.args, 'gradfile'):
+            self.coeffs = utils.get_coefficients(self.args.vendor,
+                                                 self.args.gradfile)
+        else:
+            self.coeffs = utils.get_coefficients(self.args.vendor,
+                                                 self.args.coeffile)
 
     def run(self):
         pass

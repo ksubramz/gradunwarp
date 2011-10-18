@@ -11,6 +11,9 @@ VERSION = '2.0.0'
 usage = 'foo'
 
 
+# the coefficient array size for Siemens .coef files
+cas = 14
+
 def get_logger():
     log = logging.getLogger('gradunwarp')
     log.setLevel(logging.INFO)
