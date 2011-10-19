@@ -16,6 +16,10 @@ siemens_cas = 14
 ge_cas = 6
 
 
+# max jacobian determinant for siemens
+siemens_max_det = 10.
+
+
 def get_logger():
     log = logging.getLogger('gradunwarp')
     log.setLevel(logging.INFO)

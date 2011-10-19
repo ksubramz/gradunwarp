@@ -5,21 +5,49 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 import numpy as np
+from collections import namedtuple
+import math
+from math import sqrt, cos, pi
 
 
-def transform_coordinates(A1, A2, A3, M):
+# This is a container class that has 3 np.arrays which contain
+# the x, y and z coordinates respectively. For example, the output
+# of a meshgrid belongs to this
+# x, y, z = meshgrid(np.arange(5), np.arange(6), np.arange(7))
+# cv = CoordsVector(x=x, y=y, z=z)
+CoordsVector = namedtuple('CoordsVector', 'x, y, z')
+
+
+def transform_coordinates(A, M):
     ''' 4x4 matrix M operates on orthogonal coordinates arrays
     A1, A2, A3 to give B1, B2, B3
     '''
+    A1 = A.x
+    A2 = A.y
+    A3 = A.z
     B1 = A1 * M[0, 0] + A2 * M[0, 1] + A3 * M[0, 2] + M[0, 3]
     B2 = A1 * M[1, 0] + A2 * M[1, 1] + A3 * M[1, 2] + M[1, 3]
     B3 = A1 * M[2, 0] + A2 * M[2, 1] + A3 * M[2, 2] + M[2, 3]
-    return B1, B2, B3
+    return CoordsVector(B1, B2, B3)
 
 
 def get_vol_affine(cls, infile):
     nibimage = nib.load(infile)
     return nibimage.get_data(), nibimage.get_affine()
+
+
+# memoized factorial
+class Memoize:
+    def __init__(self, f):
+        self.f = f
+        self.memo = {}
+
+    def __call__(self, *args):
+        if not args in self.memo:
+            self.memo[args] = self.f(*args)
+        return self.memo[args]
+
+factorial = Memoize(math.factorial)
 
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
@@ -155,6 +183,58 @@ def ndgrid(*args, **kwargs):
     """
     kwargs['indexing'] = 'ij'
     return meshgrid(*args, **kwargs)
+
+
+def odd_factorial_fn(k):
+    f = k
+    while k >= 3:
+        k -= 2
+        f *= k
+    return f
+
+odd_factorial = Memoize(odd_factorial_fn)
+
+
+# From the scipy ticket
+# http://projects.scipy.org/scipy/attachment/ticket/1296/assoc_legendre.py
+def legendre(nu, mu, x):
+    """Compute the associated Legendre polynomial with degree nu and order mu.
+    This function uses the recursion formula in the degree nu.
+    (Abramowitz & Stegun, Section 8.5.)
+    """
+    if mu < 0 or mu > nu:
+        raise ValueError('require 0 <= mu <= nu, but mu=%d and nu=%d' \
+                         % (nu, mu))
+    if abs(x) > 1:
+        raise ValueError('require -1 <= x <= 1, but x=%f', x)
+
+    # Compute the initial term in the recursion.
+    if mu == 0:
+        p_nu = 1.0
+    else:
+        s = 1
+        if mu & 1:
+            s = -1
+        z = sqrt(1 - x ** 2)
+        p_nu = s * odd_factorial(2 * mu - 1) * z ** mu
+
+    if mu == nu:
+        return p_nu
+
+    # Compute the next term in the recursion.
+    p_nu_prev = p_nu
+    p_nu = x * (2 * mu + 1) * p_nu
+
+    if nu == mu + 1:
+        return p_nu
+
+    # Iterate the recursion relation.
+    for n in xrange(mu + 2, nu + 1):
+        result = (x * (2 * n - 1) * p_nu - (n + mu - 1) * p_nu_prev) / (n - mu)
+        p_nu_prev = p_nu
+        p_nu = result
+
+    return result
 
 
 if __name__ == '__main__':
