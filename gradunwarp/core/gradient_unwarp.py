@@ -78,7 +78,7 @@ class GradientUnwarpRunner(object):
             self.coeffs = coeffs.get_coefficients(self.args.vendor,
                                                  self.args.coeffile)
 
-        self.vol, self.m_rcs2ras = utils.get_vol_affine(self.args‥infile)
+        self.vol, self.m_rcs2ras = utils.get_vol_affine(self.args.infile)
 
         unwarper = Unwarper(self.vol, self.m_rcs2ras, self.args.vendor,
                             self.coeffs)

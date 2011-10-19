@@ -8,7 +8,7 @@ from collections import namedtuple
 import numpy as np
 import re
 import globals
-from globals import cas
+from globals import siemens_cas, ge_cas
 
 
 log = globals.get_logger()
@@ -62,7 +62,7 @@ def get_siemens_coef(cfile):
         if cfile.startswith(rad):
             R0_m = R0m_map[rad]
 
-    coef_array_sz = cas
+    coef_array_sz = siemens_cas
     # allegra is slightly different
     if cfile.startswith('allegra'):
         coef_array_sz = 15
@@ -82,8 +82,7 @@ def get_siemens_coef(cfile):
 def get_ge_coef(cfile):
     ''' Parse the GE .coef file.
     '''
-    coef_array_sz = 6
-    ax = ay = az = bx = by = bz = np.zeros((coef_array_sz, coef_array_sz))
+    ax = ay = az = bx = by = bz = np.zeros((ge_cas, ge_cas))
     txt_var_map = {'Alpha_x': ax,
                    'Alpha_y': ay,
                    'Alpha_z': az,
