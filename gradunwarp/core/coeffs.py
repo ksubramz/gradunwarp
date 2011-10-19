@@ -14,7 +14,7 @@ from globals import cas
 log = globals.get_logger()
 
 
-coeffs = namedtuple('coeffs', 'alpha_x, alpha_y, alpha_z, \
+Coeffs = namedtuple('Coeffs', 'alpha_x, alpha_y, alpha_z, \
                         beta_x, beta_y, beta_z, R0_m')
 
 
@@ -76,4 +76,21 @@ def get_siemens_coef(cfile):
 
     coef_file_parse(cfile, txt_var_map)
 
-    return coeffs(ax, ay, az, bx, by, bz, R0_m)
+    return Coeffs(ax, ay, az, bx, by, bz, R0_m)
+
+
+def get_ge_coef(cfile):
+    ''' Parse the GE .coef file.
+    '''
+    coef_array_sz = 6
+    ax = ay = az = bx = by = bz = np.zeros((coef_array_sz, coef_array_sz))
+    txt_var_map = {'Alpha_x': ax,
+                   'Alpha_y': ay,
+                   'Alpha_z': az,
+                   'Beta_x': bx,
+                   'Beta_y': by,
+                   'Beta_z': bz}
+
+    coef_file_parse(cfile, txt_var_map)
+
+    return Coeffs(ax, ay, az, bx, by, bz, R0_m)

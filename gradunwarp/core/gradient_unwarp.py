@@ -8,6 +8,7 @@ import argparse as arg
 import os
 import logging
 import globals
+import coeffs
 
 log = globals.get_logger()
 
@@ -47,6 +48,8 @@ def argument_parse_gradunwarp():
         if not os.path.exists(args.coeffile):
             raise IOError(args.coeffile + ' not found')
 
+    return args
+
 
 class GradientUnwarpRunner(object):
     ''' Takes the option datastructure after parsing the commandline.
@@ -63,17 +66,26 @@ class GradientUnwarpRunner(object):
         if hasattr(self.args, 'verbose'):
             log.setLevel(logging.DEBUG)
 
+    def run(self):
+        ''' run the unwarp resample
+        '''
         # get the spherical harmonics coefficients from parsing
         # the given .coeff file xor .grad file
         if hasattr(self.args, 'gradfile'):
-            self.coeffs = utils.get_coefficients(self.args.vendor,
+            self.coeffs = coeffs.get_coefficients(self.args.vendor,
                                                  self.args.gradfile)
         else:
-            self.coeffs = utils.get_coefficients(self.args.vendor,
+            self.coeffs = coeffs.get_coefficients(self.args.vendor,
                                                  self.args.coeffile)
 
-    def run(self):
-        pass
+        self.vol, self.m_rcs2ras = utils.get_vol_affine(self.args‥infile)
+
+        unwarper = Unwarper(self.vol, self.m_rcs2ras, self.args.vendor,
+                            self.coeffs)
+        if hasattr(self.args, 'warp') and self.args.warp:
+            unwarper.warp = True
+        if hasattr(self.args, 'nojac') and self.args.nojac:
+            unwarper.nojac = True
 
     def write(self):
         pass
