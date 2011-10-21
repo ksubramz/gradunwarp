@@ -158,5 +158,28 @@ def ndgrid(*args, **kwargs):
 
 
 if __name__ == '__main__':
-    import doctest
-    doctest.testmod()
+    print('Testing meshgrid...')
+    #import doctest
+    #doctest.testmod()
+
+    print('Profiling interp3...')
+    print('Interpolation for a million coordinates should be \
+          in the order of seconds. Anything significantly less \
+          is considered slow')
+    import time
+    arr = np.linspace(-4, 4, 6000)
+    arr = np.sin(arr)
+    arr = arr.reshape(10, 20, 30).astype('float32')
+    gridn = 1
+    for c in xrange(8):
+        R1 = np.linspace(4., 5., gridn).astype('float32')
+        C1 = np.linspace(11., 12., gridn).astype('float32')
+        S1 = np.linspace(15., 16., gridn).astype('float32')
+        tic = time.time()
+        v1 = interp3_tricubic(arr, R1, C1, S1)
+        if gridn == 10 or gridn == 1:
+            print v1
+        toc = time.time()
+        print "1 followed by %d zeros" % c, "|", gridn, "|", \
+               toc - tic, "seconds"
+        gridn = gridn * 10
