@@ -237,15 +237,34 @@ def legendre(nu, mu, x):
     return result
 
 
+def interp3(vol, R, C, S):
+    '''
+    TODO
+    '''
+    try:
+        from interp3_ext import _interp3
+    except ImportError:
+        raise ImportError('The interp3 C extension module is missing.' \
+                           ' Fallback interp3 code not yet implemented.')
+    R = R.astype(np.float32)
+    C = C.astype(np.float32)
+    S = S.astype(np.float32)
+    assert vol.ndim == 3
+    assert C.ndim == R.ndim == S.ndim
+    assert C.shape == R.shape == S.shape
+    V = _interp3(vol, R, C, S)
+    return V
+
+
 if __name__ == '__main__':
     print('Testing meshgrid...')
     #import doctest
     #doctest.testmod()
 
     print('Profiling interp3...')
-    print('Interpolation for a million coordinates should be \
-          in the order of seconds. Anything significantly less \
-          is considered slow')
+    print('Interpolation for a million coordinates should be' \
+          ' in the order of seconds. Anything significantly less ' \
+          'is considered slow')
     import time
     arr = np.linspace(-4, 4, 6000)
     arr = np.sin(arr)
@@ -256,7 +275,7 @@ if __name__ == '__main__':
         C1 = np.linspace(11., 12., gridn).astype('float32')
         S1 = np.linspace(15., 16., gridn).astype('float32')
         tic = time.time()
-        v1 = interp3_tricubic(arr, R1, C1, S1)
+        v1 = interp3(arr, R1, C1, S1)
         if gridn == 10 or gridn == 1:
             print v1
         toc = time.time()
