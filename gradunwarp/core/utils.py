@@ -31,7 +31,12 @@ def transform_coordinates(A, M):
     return CoordsVector(B1, B2, B3)
 
 
-def get_vol_affine(cls, infile):
+def get_vol_affine(infile):
+    try:
+        import nibabel as nib
+    except ImportError:
+        raise ImportError('gradunwarp needs nibabel for I/O of mgz/nifti files.'
+                          ' Please install')
     nibimage = nib.load(infile)
     return nibimage.get_data(), nibimage.get_affine()
 
@@ -185,19 +190,17 @@ def ndgrid(*args, **kwargs):
     return meshgrid(*args, **kwargs)
 
 
-def odd_factorial_fn(k):
+def odd_factorial(k):
     f = k
     while k >= 3:
         k -= 2
         f *= k
     return f
 
-odd_factorial = Memoize(odd_factorial_fn)
-
 
 # From the scipy ticket
 # http://projects.scipy.org/scipy/attachment/ticket/1296/assoc_legendre.py
-def legendre(nu, mu, x):
+def legendre_old(nu, mu, x):
     """Compute the associated Legendre polynomial with degree nu and order mu.
     This function uses the recursion formula in the degree nu.
     (Abramowitz & Stegun, Section 8.5.)
@@ -205,8 +208,8 @@ def legendre(nu, mu, x):
     if mu < 0 or mu > nu:
         raise ValueError('require 0 <= mu <= nu, but mu=%d and nu=%d' \
                          % (nu, mu))
-    if abs(x) > 1:
-        raise ValueError('require -1 <= x <= 1, but x=%f', x)
+    # if abs(x) > 1:
+    #    raise ValueError('require -1 <= x <= 1, but x=%f', x)
 
     # Compute the initial term in the recursion.
     if mu == 0:
@@ -236,6 +239,19 @@ def legendre(nu, mu, x):
 
     return result
 
+
+def legendre(nu, mu, x):
+    try:
+        from legendre_ext import _legendre
+    except ImportError:
+        raise ImportError('The legendre C extension module is missing.' \
+                           ' Fallback legendre code not yet implemented.')
+    nu = int(nu)
+    mu = int(mu)
+    x = x.astype(np.float32)
+    b = _legendre(nu, mu, x)
+    return b
+    
 
 def interp3(vol, R, C, S):
     '''

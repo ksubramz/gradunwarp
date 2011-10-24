@@ -9,7 +9,8 @@ import os
 import numpy as np
 from numpy.testing import assert_equal, assert_array_equal, \
     assert_array_almost_equal, assert_almost_equal
-from ..utils import interp3
+from gradunwarp.core.utils import interp3
+from gradunwarp.core.utils import legendre
 
 
 def test_interp3():
@@ -36,3 +37,10 @@ def test_interp3():
     S1 = np.linspace(15., 16., gridn).astype('float32')
     ac3 = interp3(arr, R1, C1, S1)
     assert_array_almost_equal(ex3, ac3)
+
+
+def test_legendre():
+    arr = np.array([0.1, 0.2, 0.3])
+    ex1 = np.array([44.83644, 75.85031, 82.44417])
+    ac1 = legendre(6, 3, arr)
+    assert_array_almost_equal(ex1, ac1, 5)

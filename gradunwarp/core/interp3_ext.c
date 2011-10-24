@@ -1,3 +1,11 @@
+/*
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the gradunwarp package for the
+#   copyright and license terms.
+#
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+*/
 #include "Python.h"
 #include "numpy/arrayobject.h"
 #include <math.h>

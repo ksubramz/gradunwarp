@@ -9,6 +9,8 @@ import os
 import logging
 import globals
 import coeffs
+import utils
+from unwarp_resample import Unwarper
 
 log = globals.get_logger()
 
@@ -39,8 +41,6 @@ def argument_parse_gradunwarp():
     # do some validation
     if not os.path.exists(args.infile):
         raise IOError(args.infile + ' not found')
-    if not os.path.exists(args.outfile):
-        raise IOError(args.outfile + ' not found')
     if args.gradfile:
         if not os.path.exists(args.gradfile):
             raise IOError(args.gradfile + ' not found')
@@ -71,7 +71,8 @@ class GradientUnwarpRunner(object):
         '''
         # get the spherical harmonics coefficients from parsing
         # the given .coeff file xor .grad file
-        if hasattr(self.args, 'gradfile'):
+        print self.args
+        if hasattr(self.args, 'gradfile') and self.args.gradfile:
             self.coeffs = coeffs.get_coefficients(self.args.vendor,
                                                  self.args.gradfile)
         else:
@@ -82,6 +83,8 @@ class GradientUnwarpRunner(object):
 
         unwarper = Unwarper(self.vol, self.m_rcs2ras, self.args.vendor,
                             self.coeffs)
+        unwarper.run()
+        unwarper.write()
         if hasattr(self.args, 'warp') and self.args.warp:
             unwarper.warp = True
         if hasattr(self.args, 'nojac') and self.args.nojac:
