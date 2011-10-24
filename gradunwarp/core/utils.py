@@ -52,7 +52,8 @@ class Memoize:
             self.memo[args] = self.f(*args)
         return self.memo[args]
 
-factorial = Memoize(math.factorial)
+#factorial = Memoize(math.factorial)
+factorial = math.factorial
 
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##

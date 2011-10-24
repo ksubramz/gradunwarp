@@ -12,7 +12,7 @@ import globals
 from globals import siemens_max_det
 import nibabel as nib
 import pdb
-import scipy
+import math
 
 
 log = globals.get_logger()
@@ -110,9 +110,45 @@ class Unwarper(object):
         vjacmult_lps : np.array
             the jacobian multiplier (determinant)
         '''
-        # compute the displacements for the voxel positions in LAI
-        dv, modv = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz)
-        log.info('finished spherical harmonics evaluation')
+        # in case of not high memory option, downsample the coords
+        # to something which the spherical harmonics evaluation can
+        # handle.
+        # even for a 256^3 image, a 8 GB RAM machine struggles
+        if not self.args.highmem:
+            # convert the xyz coordinates into warp space
+            vxyz_down, m_gw2xyz, dvshape = xyz2warpspace(vxyz)
+
+            # compute the displacements for the voxel positions in LAI
+            dv_1d_down = eval_spherical_harmonics(self.coeffs, self.vendor,
+                                                  vxyz_down)
+            log.info('finished spherical harmonics evaluation')
+
+            # reshape them before sending them into warpspace2xyx for
+            # interpolation
+            dvx_down = np.reshape(dv_1d_down.x, dvshape)
+            dvy_down = np.reshape(dv_1d_down.y, dvshape)
+            dvz_down = np.reshape(dv_1d_down.z, dvshape)
+
+            # convert the lower sampled spherical harmonics displacements
+            # to xyz
+            dv = warpspace2xyz(vxyz, CV(dvx_down, dvy_down, dvz_down),
+                               m_gw2xyz)
+
+        else:
+            # make them a 1d array
+            x1d = np.ravel(vxyz.x)
+            y1d = np.ravel(vxyz.y)
+            z1d = np.ravel(vxyz.z)
+            vxyz_1d = CV(x1d, y1d, z1d)
+
+            # compute the displacements for the voxel positions in LAI
+            dv_1d = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz_1d)
+            log.info('finished spherical harmonics evaluation')
+
+            dvx = np.reshape(dv_1d.x, vxyz.x.shape)
+            dvy = np.reshape(dv_1d.y, vxyz.y.shape)
+            dvz = np.reshape(dv_1d.z, vxyz.z.shape)
+            dv = CV(dvx, dvy, dvz)
 
         # Jacobian multiplier is unitless but calculated in terms of
         # displacements and coordinates in LPS orientation
@@ -133,7 +169,7 @@ class Unwarper(object):
 
             # convert the locations got into RCS indices
             vrcsw = utils.transform_coordinates(vxyzw,
-                                                np.linalg.inv(self.m_rcs2lai))
+                                                np.linalg.inv(m_rcs2lai))
 
             # resample the image
             log.info('Interpolating the image')
@@ -197,7 +233,7 @@ def eval_siemens_jacobian_mult(F, dxyz):
     return jacdet
 
 
-def eval_spherical_harmonics(coeffs, vendor, vxyz, resolution=None):
+def eval_spherical_harmonics(coeffs, vendor, vxyz):
     ''' Evaluate spherical harmonics
 
     Parameters
@@ -214,33 +250,9 @@ def eval_spherical_harmonics(coeffs, vendor, vxyz, resolution=None):
     # convert radius into mm
     R0 = coeffs.R0_m * 1000
 
-    # in case vxyz is float
-    if type(vxyz) is float:
-        if not resolution:
-            raise ValueError('eval_spherical_harmonics needs a resolution. '
-                             'argument if vxyz is scalar or 3-element vector')
-        coords = np.linspace(-vxyz, vxyz, resolution)
-        x, y, z = utils.ndgrid(coords, coords, coords)
-
-    # in case vxyz is a 3-element vector where each element represents the
-    # edges of the x, y and z direction respectively
-    if len(vxyz) == 3 and not type(vxyz) == CV:
-        if not resolution:
-            raise ValueError('eval_spherical_harmonics needs a resolution '
-                             'argument if vxyz is scalar or 3-element vector')
-        cx = np.linspace(-vxyz[0], vxyz[0], resolution)
-        cy = np.linspace(-vxyz[1], vxyz[1], resolution)
-        cz = np.linspace(-vxyz[2], vxyz[2], resolution)
-        x, y, z = utils.ndgrid(cx, cy, cz)
-
-    # at this point vxyz is an instance of CoordsVector
     x, y, z = vxyz
 
-    # make them a 1d array
-    x1d = np.ravel(x, order='F')
-    y1d = np.ravel(y, order='F')
-    z1d = np.ravel(z, order='F')
-
+    pdb.set_trace()
     log.info('calculating displacements (mm) '
             'using spherical harmonics coeffcients...')
     if vendor == 'siemens':
@@ -259,9 +271,6 @@ def eval_spherical_harmonics(coeffs, vendor, vxyz, resolution=None):
         log.info('along z...')
         bz = ge_D(coeffs.alpha_z, coeffs.beta_z, x1d, y1d, z1d)
 
-    Bx = np.reshape(bx, x.shape, order='F')
-    By = np.reshape(by, y.shape, order='F')
-    Bz = np.reshape(bz, z.shape, order='F')
     return CV(Bx * R0, By * R0, Bz * R0), CV(x, y, z)
 
 
@@ -281,8 +290,8 @@ def siemens_B(alpha, beta, x1, y1, z1, R0):
         f = np.power(r / R0, n)
         for m in xrange(0, n + 1):
             f2 = alpha[n, m] * np.cos(m * phi) + beta[n, m] * np.sin(m * phi)
-            #_ptemp = utils.legendre(n, m, np.cos(theta))
-            _ptemp = scipy.special.lpmv(m, n, np.cos(theta))
+            _ptemp = utils.legendre(n, m, np.cos(theta))
+            #_ptemp = scipy.special.lpmv(m, n, np.cos(theta))
             normfact = 1
             # this is Siemens normalization
             if m > 0:
@@ -318,3 +327,37 @@ def ge_D(alpha, beta, x1, y1, z1):
             d = d + f * _p * f2
     d = d / 100.0  # cm back to meters
     return d
+
+
+def xyz2warpspace():
+    '''
+    '''
+    crds = np.arange(globals.siemens_fov_min, globals.siemens_fov_max,
+                     globals.siemens_resolution)
+    x, y, z = utils.meshgrid(crds, crds, crds)
+    x1d = np.ravel(x)
+    y1d = np.ravel(y)
+    z1d = np.ravel(z)
+    nc = z.shape[0]
+    scale = (z1d[1] - z1d[0]) / (nc - 1)
+    m_xyz2gw = np.array([[scale, 0, 0, z1d[0]],
+                         [0, scale, 0, z1d[0]],
+                         [0, 0, scale, z1d[0]],
+                         [0, 0, 0, 1]])
+    return CV(x1d, y1d, z1d), np.linalg.inv(m_xyz2gw), x.shape
+
+
+def warpspace2xyz(vxyz, dv, m_gw2xyz):
+    '''
+    '''
+    _gw_rcs = utils.transform_coordinates(vxyz, m_gw2xyz)
+    gx = _gw_rcs.x.ravel()
+    gy = _gw_rcs.y.ravel()
+    gz = _gw_rcs.z.ravel()
+    print dv.x.shape
+   
+    dvx_1d = utils.interp3(dv.x, gx, gy, gz)
+    dvy_1d = utils.interp3(dv.y, gx, gy, gz)
+    dvz_1d = utils.interp3(dv.z, gx, gy, gz)
+
+    return CV(dvx_1d, dvy_1d, dvz_1d)

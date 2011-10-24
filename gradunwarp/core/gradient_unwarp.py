@@ -35,6 +35,7 @@ def argument_parse_gradunwarp():
     p.add_argument('-n', '--nojacobian', dest='nojac', action='store_true',
                   default=False)
     p.add_argument('--verbose', action='store_true', default=False)
+    p.add_argument('--highmem', action='store_true', default=False)
 
     args = p.parse_args()
 
