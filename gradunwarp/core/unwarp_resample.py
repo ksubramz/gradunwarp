@@ -33,6 +33,7 @@ class Unwarper(object):
         self.coeffs = coeffs
         self.warp = False
         self.nojac = False
+        self.m_rcs2lai = None
 
     def run(self):
         '''
@@ -53,8 +54,9 @@ class Unwarper(object):
         # indices of image volume
         nr, nc, ns = self.vol.shape[:3]
         vr, vc = utils.meshgrid(np.arange(nr), np.arange(nc))
-        vr3, vc3, vs3 = utils.meshgrid(np.arange(nr), np.arange(nc), np.arange(ns))
+        vc3, vr3, vs3 = utils.meshgrid(np.arange(nr), np.arange(nc), np.arange(ns))
         vrcs = CV(x=vr3, y=vc3, z=vs3)
+        vxyz = utils.transform_coordinates(vrcs, m_rcs2lai)
 
         # account for half-voxel shift in R and C directions
         halfvox = np.zeros((4, 4))
@@ -95,7 +97,10 @@ class Unwarper(object):
 
         log.info('Evaluating spherical harmonics')
         log.info('Slice progress..')
+        _dv, _dxyz = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz)
+
         # for each slice
+        '''
         for slice in xrange(ns):
             sys.stdout.flush()
             if (slice + 1) % 10 == 0:
@@ -111,15 +116,15 @@ class Unwarper(object):
             vxyz2d = utils.transform_coordinates(vrcs2d, m_rcs2lai)
 
             # compute new coordinates and the jacobian determinant
-            # TODO still not clear about what to return
             moddv, modxyz = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz2d)
             dvx[..., slice] = moddv.x
             dvy[..., slice] = moddv.y
             dvz[..., slice] = moddv.z
+            '''
 
-        print()
-        dv = CV(dvx, dvy, dvz)
-        vxyz = utils.transform_coordinates(vrcs, m_rcs2lai)
+        print
+        #dv = CV(dvx, dvy, dvz)
+        dv = _dv
         self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, dv, dxyz,
                                                                  m_rcs2lai)
 
@@ -152,21 +157,6 @@ class Unwarper(object):
         vjacmult_lps : np.array
             the jacobian multiplier (determinant)
         '''
-        # make them a 1d array
-        # x1d = np.ravel(vxyz.x)
-        # y1d = np.ravel(vxyz.y)
-        # z1d = np.ravel(vxyz.z)
-        # vxyz_1d = CV(x1d, y1d, z1d)
-
-        # compute the displacements for the voxel positions in LAI
-        # dv_1d, modxyz = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz_1d)
-        # log.info('finished spherical harmonics evaluation')
-
-        # dvx = np.reshape(dv_1d.x, vxyz.x.shape)
-        # dvy = np.reshape(dv_1d.y, vxyz.y.shape)
-        # dvz = np.reshape(dv_1d.z, vxyz.z.shape)
-        # dv = CV(dvx, dvy, dvz)
-
         # Jacobian multiplier is unitless but calculated in terms of
         # displacements and coordinates in LPS orientation
         # (right handed form of p.o.v of patient )
@@ -181,8 +171,11 @@ class Unwarper(object):
                        y=vxyz.y + self.polarity * dv.y,
                        z=vxyz.z + self.polarity * dv.z)
 
+            print vxyzw.x[40,40,40]
+
             # if polarity is negative, the jacobian is also inversed
-            vjacdet_lps = 1. / vjacdet_lps
+            if self.polarity == -1:
+                vjacdet_lps = 1. / vjacdet_lps
 
             # convert the locations got into RCS indices
             vrcsw = utils.transform_coordinates(vxyzw,
@@ -192,8 +185,8 @@ class Unwarper(object):
             log.info('Interpolating the image')
             if self.vol.ndim == 3:
                 # note that out is always in float32
-                out = utils.interp3(self.vol, vrcsw.x, vrcsw.y, vrcsw.z)
-                out = out.reshape(self.vol.shape)
+                out = utils.interp3(self.vol, vrcsw.y, vrcsw.x, vrcsw.z)
+                #out = out.reshape(self.vol.shape)
             if self.vol.ndim == 4:
                 nframes = self.vol.shape[3]
                 out = np.zeros(self.vol.shape)
@@ -223,6 +216,7 @@ class Unwarper(object):
 
             # return image and the jacobian
             return out, vjacdet_lpsw
+            self.m_rcs2lai = m_rcs2lai
 
         if self.vendor == 'ge':
             pass  # for now
@@ -287,6 +281,7 @@ def eval_spherical_harmonics(coeffs, vendor, vxyz):
 
     return CV(bx * R0, by * R0, bz * R0), CV(x, y, z)
 
+
 #@profile
 def siemens_B(alpha, beta, x1, y1, z1, R0):
     ''' Calculate displacement field from Siemens coefficients
@@ -310,8 +305,8 @@ def siemens_B(alpha, beta, x1, y1, z1, R0):
             # this is Siemens normalization
             if m > 0:
                 normfact = math.pow(-1, m) * \
-                math.sqrt((2 * n + 1) * factorial(n - m) \
-                          / (2 * factorial(n + m)))
+                math.sqrt(float((2 * n + 1) * factorial(n - m)) \
+                          / float(2 * factorial(n + m)))
             _p = normfact * _ptemp
             b = b + f * _p * f2
     return b

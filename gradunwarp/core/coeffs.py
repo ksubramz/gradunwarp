@@ -71,6 +71,12 @@ def get_siemens_coef(cfile):
     if cfile.startswith('allegra'):
         coef_array_sz = 15
     ax = ay = az = bx = by = bz = np.zeros((coef_array_sz, coef_array_sz))
+    ax = np.zeros((coef_array_sz, coef_array_sz))
+    ay = np.zeros((coef_array_sz, coef_array_sz))
+    az = np.zeros((coef_array_sz, coef_array_sz))
+    bx = np.zeros((coef_array_sz, coef_array_sz))
+    by = np.zeros((coef_array_sz, coef_array_sz))
+    bz = np.zeros((coef_array_sz, coef_array_sz))
     txt_var_map = {'Alpha_x': ax,
                    'Alpha_y': ay,
                    'Alpha_z': az,
@@ -86,7 +92,12 @@ def get_siemens_coef(cfile):
 def get_ge_coef(cfile):
     ''' Parse the GE .coef file.
     '''
-    ax = ay = az = bx = by = bz = np.zeros((ge_cas, ge_cas))
+    ax = np.zeros((ge_cas, ge_cas))
+    ay = np.zeros((ge_cas, ge_cas))
+    az = np.zeros((ge_cas, ge_cas))
+    bx = np.zeros((ge_cas, ge_cas))
+    by = np.zeros((ge_cas, ge_cas))
+    bz = np.zeros((ge_cas, ge_cas))
     txt_var_map = {'Alpha_x': ax,
                    'Alpha_y': ay,
                    'Alpha_z': az,
@@ -125,6 +136,9 @@ def grad_file_parse(gfile, txt_var_map):
     line = gf.next()
     line = gf.next()
 
+    xmax = 0
+    ymax = 0
+
     while 1:
         lindex =  line.find('(')
         rindex =  line.find(')')
@@ -132,6 +146,10 @@ def grad_file_parse(gfile, txt_var_map):
         xs, ys = arrindex.split(',')
         x = int(xs) 
         y = int(ys)
+        if x > xmax:
+            xmax = x
+        if y > ymax:
+            ymax = y
         if line.find('A') != -1 and line.find('x') != -1:
             txt_var_map['Alpha_x'][x,y] = float(line.split()[-2])
         if line.find('A') != -1 and line.find('y') != -1:
@@ -150,7 +168,7 @@ def grad_file_parse(gfile, txt_var_map):
             break
 
     # just return R0_m but also txt_var_map is returned
-    return R0_m
+    return R0_m, (xmax, ymax)
 
 def get_siemens_grad(gfile):
     ''' Parse the siemens .grad file
@@ -159,7 +177,12 @@ def get_siemens_grad(gfile):
     # allegra is slightly different
     if gfile.startswith('coef_AC44'):
         coef_array_sz = 15
-    ax = ay = az = bx = by = bz = np.zeros((coef_array_sz, coef_array_sz))
+    ax = np.zeros((coef_array_sz, coef_array_sz))
+    ay = np.zeros((coef_array_sz, coef_array_sz))
+    az = np.zeros((coef_array_sz, coef_array_sz))
+    bx = np.zeros((coef_array_sz, coef_array_sz))
+    by = np.zeros((coef_array_sz, coef_array_sz))
+    bz = np.zeros((coef_array_sz, coef_array_sz))
     txt_var_map = {'Alpha_x': ax,
                    'Alpha_y': ay,
                    'Alpha_z': az,
@@ -167,7 +190,16 @@ def get_siemens_grad(gfile):
                    'Beta_y': by,
                    'Beta_z': bz}
 
-    R0_m = grad_file_parse(gfile, txt_var_map)
+    R0_m, max_ind = grad_file_parse(gfile, txt_var_map)
+    ind = max(max_ind)
+
+    # pruned alphas and betas
+    ax = ax[:ind+1, :ind+1]
+    ay = ay[:ind+1, :ind+1]
+    az = az[:ind+1, :ind+1]
+    bx = bx[:ind+1, :ind+1]
+    by = by[:ind+1, :ind+1]
+    bz = bz[:ind+1, :ind+1]
 
     return Coeffs(ax, ay, az, bx, by, bz, R0_m)
 
