@@ -72,7 +72,6 @@ class GradientUnwarpRunner(object):
         '''
         # get the spherical harmonics coefficients from parsing
         # the given .coeff file xor .grad file
-        print self.args
         if hasattr(self.args, 'gradfile') and self.args.gradfile:
             self.coeffs = coeffs.get_coefficients(self.args.vendor,
                                                  self.args.gradfile)
@@ -84,12 +83,12 @@ class GradientUnwarpRunner(object):
 
         unwarper = Unwarper(self.vol, self.m_rcs2ras, self.args.vendor,
                             self.coeffs)
-        unwarper.run()
-        unwarper.write()
         if hasattr(self.args, 'warp') and self.args.warp:
             unwarper.warp = True
         if hasattr(self.args, 'nojac') and self.args.nojac:
             unwarper.nojac = True
+        unwarper.run()
+        unwarper.write()
 
     def write(self):
         pass

@@ -5,6 +5,7 @@
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 import numpy as np
+import sys
 import utils
 from utils import CoordsVector as CV
 from utils import factorial
@@ -13,9 +14,11 @@ from globals import siemens_max_det
 import nibabel as nib
 import pdb
 import math
+import logging
 
+np.seterr(all='raise')
 
-log = globals.get_logger()
+log = logging.getLogger('gradunwarp')
 
 
 class Unwarper(object):
@@ -49,17 +52,15 @@ class Unwarper(object):
 
         # indices of image volume
         nr, nc, ns = self.vol.shape[:3]
-        vr, vc, vs = utils.ndgrid(np.arange(nr), np.arange(nc), np.arange(ns))
-        vrcs = CV(x=vr, y=vc, z=vs)
+        vr, vc = utils.meshgrid(np.arange(nr), np.arange(nc))
+        vr3, vc3, vs3 = utils.meshgrid(np.arange(nr), np.arange(nc), np.arange(ns))
+        vrcs = CV(x=vr3, y=vc3, z=vs3)
 
         # account for half-voxel shift in R and C directions
         halfvox = np.zeros((4, 4))
         halfvox[0, 3] = m_rcs2lai[0, 0] / 2.0
         halfvox[1, 3] = m_rcs2lai[1, 1] / 2.0
         m_rcs2lai = m_rcs2lai + halfvox
-
-        # convert image vol coordinates from RAS to LAI
-        vxyz = utils.transform_coordinates(vrcs, m_rcs2lai)
 
         # extract rotational and scaling parts of the transformation matrix
         # ignore the translation part
@@ -77,18 +78,59 @@ class Unwarper(object):
         ones = CV(1., 1., 1.)
         dxyz = utils.transform_coordinates(ones, r_rcs2lai)
 
-        # compute new coordinates and the jacobian determinant
-        # TODO still not clear about what to return
-        self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, dxyz,
-                                                             m_rcs2lai)
+        # # convert image vol coordinates from RAS to LAI
+        # vxyz = utils.transform_coordinates(vrcs, m_rcs2lai)
+
+        # # compute new coordinates and the jacobian determinant
+        # # TODO still not clear about what to return
+        # self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, dxyz,
+        #                                                     m_rcs2lai)
+
+        # indices corresponding to the RC subscripts
+        imidx = vr + vc * nr
+
+        dvx = np.zeros((nr, nc, ns))
+        dvy = np.zeros((nr, nc, ns))
+        dvz = np.zeros((nr, nc, ns))
+
+        log.info('Evaluating spherical harmonics')
+        log.info('Slice progress..')
+        # for each slice
+        for slice in xrange(ns):
+            sys.stdout.flush()
+            if (slice + 1) % 10 == 0:
+                print(slice + 1),
+            else:
+                print('.'),
+
+            # we are doing it slice by slice
+            vs = np.ones(vr.shape) * slice
+
+            vrcs2d = CV(vr, vc, slice)
+            # rcs2lai
+            vxyz2d = utils.transform_coordinates(vrcs2d, m_rcs2lai)
+
+            # compute new coordinates and the jacobian determinant
+            # TODO still not clear about what to return
+            moddv, modxyz = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz2d)
+            dvx[..., slice] = moddv.x
+            dvy[..., slice] = moddv.y
+            dvz[..., slice] = moddv.z
+
+        print()
+        dv = CV(dvx, dvy, dvz)
+        vxyz = utils.transform_coordinates(vrcs, m_rcs2lai)
+        self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, dv, dxyz,
+                                                                 m_rcs2lai)
 
         # return image is contained in self.imgout
 
     def write(self):
+        log.info('Writing the image')
         img = nib.Nifti1Image(self.out, self.m_rcs2ras)
-        img.to_filename('testsonata.nii.gz')
+        nib.save(img, 'testoutson.nii')
 
-    def non_linear_unwarp(self, vxyz, dxyz, m_rcs2lai):
+    def non_linear_unwarp(self, vxyz, dv, dxyz, m_rcs2lai):
         ''' Performs the crux of the unwarping.
         It's agnostic to Siemens or GE and uses more functions to
         do the processing separately.
@@ -110,45 +152,20 @@ class Unwarper(object):
         vjacmult_lps : np.array
             the jacobian multiplier (determinant)
         '''
-        # in case of not high memory option, downsample the coords
-        # to something which the spherical harmonics evaluation can
-        # handle.
-        # even for a 256^3 image, a 8 GB RAM machine struggles
-        if not self.args.highmem:
-            # convert the xyz coordinates into warp space
-            vxyz_down, m_gw2xyz, dvshape = xyz2warpspace(vxyz)
+        # make them a 1d array
+        # x1d = np.ravel(vxyz.x)
+        # y1d = np.ravel(vxyz.y)
+        # z1d = np.ravel(vxyz.z)
+        # vxyz_1d = CV(x1d, y1d, z1d)
 
-            # compute the displacements for the voxel positions in LAI
-            dv_1d_down = eval_spherical_harmonics(self.coeffs, self.vendor,
-                                                  vxyz_down)
-            log.info('finished spherical harmonics evaluation')
+        # compute the displacements for the voxel positions in LAI
+        # dv_1d, modxyz = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz_1d)
+        # log.info('finished spherical harmonics evaluation')
 
-            # reshape them before sending them into warpspace2xyx for
-            # interpolation
-            dvx_down = np.reshape(dv_1d_down.x, dvshape)
-            dvy_down = np.reshape(dv_1d_down.y, dvshape)
-            dvz_down = np.reshape(dv_1d_down.z, dvshape)
-
-            # convert the lower sampled spherical harmonics displacements
-            # to xyz
-            dv = warpspace2xyz(vxyz, CV(dvx_down, dvy_down, dvz_down),
-                               m_gw2xyz)
-
-        else:
-            # make them a 1d array
-            x1d = np.ravel(vxyz.x)
-            y1d = np.ravel(vxyz.y)
-            z1d = np.ravel(vxyz.z)
-            vxyz_1d = CV(x1d, y1d, z1d)
-
-            # compute the displacements for the voxel positions in LAI
-            dv_1d = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz_1d)
-            log.info('finished spherical harmonics evaluation')
-
-            dvx = np.reshape(dv_1d.x, vxyz.x.shape)
-            dvy = np.reshape(dv_1d.y, vxyz.y.shape)
-            dvz = np.reshape(dv_1d.z, vxyz.z.shape)
-            dv = CV(dvx, dvy, dvz)
+        # dvx = np.reshape(dv_1d.x, vxyz.x.shape)
+        # dvy = np.reshape(dv_1d.y, vxyz.y.shape)
+        # dvz = np.reshape(dv_1d.z, vxyz.z.shape)
+        # dv = CV(dvx, dvy, dvz)
 
         # Jacobian multiplier is unitless but calculated in terms of
         # displacements and coordinates in LPS orientation
@@ -173,26 +190,28 @@ class Unwarper(object):
 
             # resample the image
             log.info('Interpolating the image')
-            if vol.ndim == 3:
+            if self.vol.ndim == 3:
                 # note that out is always in float32
-                out = utils.interp3(vol, vrcsw.x, vrcsw.y, vrcsw.z)
-                out = out.reshape(vol.shape)
-            if vol.ndim == 4:
-                nframes = vol.shape[3]
-                out = np.zeros(vol.shape)
+                out = utils.interp3(self.vol, vrcsw.x, vrcsw.y, vrcsw.z)
+                out = out.reshape(self.vol.shape)
+            if self.vol.ndim == 4:
+                nframes = self.vol.shape[3]
+                out = np.zeros(self.vol.shape)
                 for f in nframes:
-                    _out = utils.interp3(vol[:, :, :, f],
+                    _out = utils.interp3(self.vol[:, :, :, f],
                                          vrcsw.x, vrcsw.y, vrcsw.z)
-                    out[..., f] = _out.reshape(vol.shape[:3])
+                    out[..., f] = _out.reshape(self.vol.shape[:3])
 
             # resample the jacobian determinant image
-            vjacdet_lps = vjacdet_lps.reshape(vol.shape[:3])
+            vjacdet_lps = vjacdet_lps.reshape(self.vol.shape[:3])
             vjacdet_lpsw = utils.interp3(vjacdet_lps, vrcsw.x,
                                          vrcsw.y, vrcsw.z)
 
             # find NaN voxels, report them and set them to 0
             out[np.where(np.isnan(out))] = 0.
+            out[np.where(np.isinf(out))] = 0.
             vjacdet_lpsw[np.where(np.isnan(out))] = 0.
+            vjacdet_lpsw[np.where(np.isinf(out))] = 0.
 
             # Multiply the intensity with the Jacobian det, if needed
             if not self.nojac:
@@ -212,7 +231,8 @@ class Unwarper(object):
 def eval_siemens_jacobian_mult(F, dxyz):
     '''
     '''
-    d0, d1, d2 = dxyz[0], dxyz[1], dxyz[2]
+    d0, d1, d2 = dxyz.x, dxyz.y, dxyz.z
+    #print F.x.shape, d0, d1, d2
 
     if d0 == 0 or d1 == 0 or d2 == 0:
         raise ValueError('weirdness found in Jacobian calculation')
@@ -252,28 +272,22 @@ def eval_spherical_harmonics(coeffs, vendor, vxyz):
 
     x, y, z = vxyz
 
-    pdb.set_trace()
-    log.info('calculating displacements (mm) '
-            'using spherical harmonics coeffcients...')
+    #pdb.set_trace()
+    # log.info('calculating displacements (mm) '
+    #        'using spherical harmonics coeffcients...')
     if vendor == 'siemens':
-        log.info('along x...')
-        bx = siemens_B(coeffs.alpha_x, coeffs.beta_x, x1d, y1d, z1d, R0)
-        log.info('along y...')
-        by = siemens_B(coeffs.alpha_y, coeffs.beta_y, x1d, y1d, z1d, R0)
-        log.info('along z...')
-        bz = siemens_B(coeffs.alpha_z, coeffs.beta_z, x1d, y1d, z1d, R0)
+        bx = siemens_B(coeffs.alpha_x, coeffs.beta_x, x, y, z, R0)
+        by = siemens_B(coeffs.alpha_y, coeffs.beta_y, x, y, z, R0)
+        bz = siemens_B(coeffs.alpha_z, coeffs.beta_z, x, y, z, R0)
     else:
         # GE
-        log.info('along x...')
-        bx = ge_D(coeffs.alpha_x, coeffs.beta_x, x1d, y1d, z1d)
-        log.info('along y...')
-        by = ge_D(coeffs.alpha_y, coeffs.beta_y, x1d, y1d, z1d)
-        log.info('along z...')
-        bz = ge_D(coeffs.alpha_z, coeffs.beta_z, x1d, y1d, z1d)
+        bx = ge_D(coeffs.alpha_x, coeffs.beta_x, x, y, z)
+        by = ge_D(coeffs.alpha_y, coeffs.beta_y, x, y, z)
+        bz = ge_D(coeffs.alpha_z, coeffs.beta_z, x, y, z)
 
-    return CV(Bx * R0, By * R0, Bz * R0), CV(x, y, z)
+    return CV(bx * R0, by * R0, bz * R0), CV(x, y, z)
 
-
+#@profile
 def siemens_B(alpha, beta, x1, y1, z1, R0):
     ''' Calculate displacement field from Siemens coefficients
     '''
@@ -327,37 +341,3 @@ def ge_D(alpha, beta, x1, y1, z1):
             d = d + f * _p * f2
     d = d / 100.0  # cm back to meters
     return d
-
-
-def xyz2warpspace():
-    '''
-    '''
-    crds = np.arange(globals.siemens_fov_min, globals.siemens_fov_max,
-                     globals.siemens_resolution)
-    x, y, z = utils.meshgrid(crds, crds, crds)
-    x1d = np.ravel(x)
-    y1d = np.ravel(y)
-    z1d = np.ravel(z)
-    nc = z.shape[0]
-    scale = (z1d[1] - z1d[0]) / (nc - 1)
-    m_xyz2gw = np.array([[scale, 0, 0, z1d[0]],
-                         [0, scale, 0, z1d[0]],
-                         [0, 0, scale, z1d[0]],
-                         [0, 0, 0, 1]])
-    return CV(x1d, y1d, z1d), np.linalg.inv(m_xyz2gw), x.shape
-
-
-def warpspace2xyz(vxyz, dv, m_gw2xyz):
-    '''
-    '''
-    _gw_rcs = utils.transform_coordinates(vxyz, m_gw2xyz)
-    gx = _gw_rcs.x.ravel()
-    gy = _gw_rcs.y.ravel()
-    gz = _gw_rcs.z.ravel()
-    print dv.x.shape
-   
-    dvx_1d = utils.interp3(dv.x, gx, gy, gz)
-    dvy_1d = utils.interp3(dv.y, gx, gy, gz)
-    dvz_1d = utils.interp3(dv.z, gx, gy, gz)
-
-    return CV(dvx_1d, dvy_1d, dvz_1d)

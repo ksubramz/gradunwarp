@@ -118,7 +118,7 @@ float TriCubic (float px, float py, float pz, float *volume, int xDim, int yDim,
   // which is criminal near edges
   // future work includes doing trilinear for edge cases
   // range checking is extremely important here
-  if (x < 1 || x > xDim-2 || y < 1 || y > yDim-2 || z < 1 || z > zDim-2) 
+  if (x < 2 || x > xDim-3 || y < 2 || y > yDim-3 || z < 2 || z > zDim-3) 
     return (0);
 
   dx = px - (float) x, dy = py - (float) y, dz = pz - (float) z;
