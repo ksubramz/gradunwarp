@@ -182,8 +182,7 @@ class Unwarper(object):
                              [0, .25, 0, 33.375],
                              [0,0,0,1]])
             vrcsw = utils.transform_coordinates(vxyzw,
-                                                test)
-            #                                    np.linalg.inv(m_rcs2lai))
+                                                np.linalg.inv(m_rcs2lai))
 
             # resample the image
             log.info('Interpolating the image')
