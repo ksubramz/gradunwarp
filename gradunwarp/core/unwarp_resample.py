@@ -17,7 +17,7 @@ import math
 import logging
 from scipy import ndimage
 
-np.seterr(all='raise')
+#np.seterr(all='raise')
 
 log = logging.getLogger('gradunwarp')
 
@@ -129,12 +129,14 @@ class Unwarper(object):
         self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, dv, dxyz,
                                                                  m_rcs2lai)
 
-        # return image is contained in self.imgout
-
-    def write(self):
-        log.info('Writing the image')
-        img = nib.Nifti1Image(self.out, self.m_rcs2ras)
-        nib.save(img, 'testoutson.nii')
+    def write(self, outfile):
+        log.info('Writing output to ' + outfile)
+        if outfile.endswith('.nii') or outfile.endswith('.nii.gz'):
+            img = nib.Nifti1Image(self.out, self.m_rcs2ras)
+        if outfile.endswith('.mgh') or outfile.endswith('.mgz'):
+            self.out = self.out.astype(np.float32)
+            img = nib.MGHImage(self.out, self.m_rcs2ras)
+        nib.save(img, outfile)
 
     def non_linear_unwarp(self, vxyz, dv, dxyz, m_rcs2lai):
         ''' Performs the crux of the unwarping.
@@ -177,10 +179,6 @@ class Unwarper(object):
                 vjacdet_lps = 1. / vjacdet_lps
 
             # convert the locations got into RCS indices
-            test = np.array([[0., 0., .25, 33.375],
-                             [.25, 0, 0, 33.375],
-                             [0, .25, 0, 33.375],
-                             [0,0,0,1]])
             vrcsw = utils.transform_coordinates(vxyzw,
                                                 np.linalg.inv(m_rcs2lai))
 
@@ -190,21 +188,21 @@ class Unwarper(object):
                 # note that out is always in float32
                 # out = utils.interp3(self.vol, vrcsw.z, vrcsw.x, vrcsw.y)
                 out = ndimage.interpolation.map_coordinates(self.vol,
-                                                            [vrcsw.x, vrcsw.y, vrcsw.z],
+                                                            vrcsw,
                                                             order=1)
-                #out = out.reshape(self.vol.shape)
             if self.vol.ndim == 4:
                 nframes = self.vol.shape[3]
                 out = np.zeros(self.vol.shape)
                 for f in nframes:
-                    _out = utils.interp3(self.vol[:, :, :, f],
-                                         vrcsw.x, vrcsw.y, vrcsw.z)
-                    out[..., f] = _out.reshape(self.vol.shape[:3])
+                    _out = ndimage.interpolation.map_coordinates(self.vol[..., f],
+                                                                vrcsw,
+                                                                order=1)
 
             # resample the jacobian determinant image
             vjacdet_lps = vjacdet_lps.reshape(self.vol.shape[:3])
-            vjacdet_lpsw = utils.interp3(vjacdet_lps, vrcsw.x,
-                                         vrcsw.y, vrcsw.z)
+            vjacdet_lpsw = ndimage.interpolation.map_coordinates(vjacdet_lps,
+                                                        vrcsw,
+                                                        order=1)
 
             # find NaN voxels, report them and set them to 0
             out[np.where(np.isnan(out))] = 0.

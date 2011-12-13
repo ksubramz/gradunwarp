@@ -62,6 +62,7 @@ class GradientUnwarpRunner(object):
         result of (options, args) = parser.parse_args()
         '''
         self.args = args
+        self.unwarper = None
 
         log.setLevel(logging.INFO)
         if hasattr(self.args, 'verbose'):
@@ -81,17 +82,16 @@ class GradientUnwarpRunner(object):
 
         self.vol, self.m_rcs2ras = utils.get_vol_affine(self.args.infile)
 
-        unwarper = Unwarper(self.vol, self.m_rcs2ras, self.args.vendor,
+        self.unwarper = Unwarper(self.vol, self.m_rcs2ras, self.args.vendor,
                             self.coeffs)
         if hasattr(self.args, 'warp') and self.args.warp:
-            unwarper.warp = True
+            self.unwarper.warp = True
         if hasattr(self.args, 'nojac') and self.args.nojac:
-            unwarper.nojac = True
-        unwarper.run()
-        unwarper.write()
+            self.unwarper.nojac = True
+        self.unwarper.run()
 
     def write(self):
-        pass
+        self.unwarper.write(self.args.outfile)
 
 
 if __name__ == '__main__':
