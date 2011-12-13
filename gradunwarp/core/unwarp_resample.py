@@ -36,6 +36,54 @@ class Unwarper(object):
         self.nojac = False
         self.m_rcs2lai = None
 
+        # grid is uninit by default
+        self.fovmin = None
+        self.fovmax = None
+        self.numpoints = None
+
+    def eval_spharm_grid(self, vendor, coeffs):
+        ''' returns dv'''
+        # init the grid first
+        if not self.fovmin:
+            fovmin = globals.siemens_fovmin
+        else:
+            fovmin = self.fovmin
+        if not self.fovmax:
+            fovmax = globals.siemens_fovmax
+        else:
+            fovmax = self.fovmax
+        if not self.numpoints:
+            numpoints = globals.siemens_numpoints
+        else:
+            numpoints = self.numpoints
+
+        vec = np.linspace(fovmin, fovmax, numpoints)
+        gvx, gvy, gvz = utils.meshgrid(vec, vec, vec)
+        # mm
+        cf = (fovmax - fovmin) / numpoints * 1000
+        
+        # deduce the transformation from rcs to grid
+        g_rcs2xyz = np.array( [[0, cf, 0, fovmin*1000],
+                               [cf, 0, 0, fovmin*1000],
+                               [0, 0, cf, fovmin*1000],
+                               [0, 0, 0, 1]], dtype=np.float32 )
+
+        # get the grid to rcs transformation also
+        g_xyz2rcs = np.linalg.inv(g_rcs2xyz)
+
+        # indices into the gradient displacement vol
+        gr, gc, gs = utils.meshgrid(np.arange(numpoints), np.arange(numpoints),
+                                 np.arange(numpoints), dtype=np.float32)
+
+        log.info('Evaluating spherical harmonics')
+        log.info('on a ' + str(numpoints) + '^3 grid')
+        log.info('with extents ' + str(fovmin) + ' to ' + str(fovmax))
+        gvxyz = CV(gvx, gvy, gvz)
+        _dv, _dxyz = eval_spherical_harmonics(coeffs, vendor, gvxyz)
+            
+        return _dv, CV(gr, gc, gs), g_xyz2rcs
+
+
     def run(self):
         '''
         '''
@@ -55,7 +103,7 @@ class Unwarper(object):
         # indices of image volume
         nr, nc, ns = self.vol.shape[:3]
         vr, vc = utils.meshgrid(np.arange(nr), np.arange(nc))
-        vc3, vr3, vs3 = utils.meshgrid(np.arange(nr), np.arange(nc), np.arange(ns))
+        vc3, vr3, vs3 = utils.meshgrid(np.arange(nr), np.arange(nc), np.arange(ns), dtype=np.float32)
         vrcs = CV(x=vr3, y=vc3, z=vs3)
         vxyz = utils.transform_coordinates(vrcs, m_rcs2lai)
 
@@ -89,16 +137,6 @@ class Unwarper(object):
         # self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, dxyz,
         #                                                     m_rcs2lai)
 
-        # indices corresponding to the RC subscripts
-        imidx = vr + vc * nr
-
-        dvx = np.zeros((nr, nc, ns))
-        dvy = np.zeros((nr, nc, ns))
-        dvz = np.zeros((nr, nc, ns))
-
-        log.info('Evaluating spherical harmonics')
-        log.info('Slice progress..')
-        _dv, _dxyz = eval_spherical_harmonics(self.coeffs, self.vendor, vxyz)
 
         # for each slice
         '''
@@ -125,9 +163,9 @@ class Unwarper(object):
 
         print
         #dv = CV(dvx, dvy, dvz)
-        dv = _dv
-        self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, dv, dxyz,
-                                                                 m_rcs2lai)
+        dv, grcs, g_xyz2rcs = self.eval_spharm_grid(self.vendor, self.coeffs)
+        self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, grcs, dv, dxyz,
+                                                                 m_rcs2lai, g_xyz2rcs)
 
     def write(self, outfile):
         log.info('Writing output to ' + outfile)
@@ -138,7 +176,7 @@ class Unwarper(object):
             img = nib.MGHImage(self.out, self.m_rcs2ras)
         nib.save(img, outfile)
 
-    def non_linear_unwarp(self, vxyz, dv, dxyz, m_rcs2lai):
+    def non_linear_unwarp(self, vxyz, grcs, dv, dxyz, m_rcs2lai, g_xyz2rcs):
         ''' Performs the crux of the unwarping.
         It's agnostic to Siemens or GE and uses more functions to
         do the processing separately.
@@ -165,14 +203,26 @@ class Unwarper(object):
         # (right handed form of p.o.v of patient )
         if self.vendor == 'siemens':
             if dxyz == 0:
-                vjacdet_lps = 1
+                vjacdet_lps_grid = 1
             else:
-                vjacdet_lps = eval_siemens_jacobian_mult(dv, dxyz)
+                # vjacdet_lps_grid = eval_siemens_jacobian_mult(dv, dxyz)
+                pass
 
+            vrcsg = utils.transform_coordinates(vxyz, g_xyz2rcs)
+            vrcsg_m = CV(vrcsg.y, vrcsg.x, vrcsg.z)
+            dvx = ndimage.interpolation.map_coordinates(grcs.y,
+                                                        vrcsg_m,
+                                                        order=3)
+            dvy = ndimage.interpolation.map_coordinates(grcs.x,
+                                                        vrcsg_m,
+                                                        order=3)
+            dvz = ndimage.interpolation.map_coordinates(grcs.z,
+                                                        vrcsg_m,
+                                                        order=3)
             # new locations of the image voxels in XYZ ( LAI ) coords
-            vxyzw = CV(x=vxyz.x + self.polarity * dv.x,
-                       y=vxyz.y + self.polarity * dv.y,
-                       z=vxyz.z + self.polarity * dv.z)
+            vxyzw = CV(x=vxyz.x + self.polarity * dvx,
+                       y=vxyz.y + self.polarity * dvy,
+                       z=vxyz.z + self.polarity * dvz)
 
             # if polarity is negative, the jacobian is also inversed
             if self.polarity == -1:
@@ -182,6 +232,7 @@ class Unwarper(object):
             vrcsw = utils.transform_coordinates(vxyzw,
                                                 np.linalg.inv(m_rcs2lai))
 
+            del vxyzw, dvx, dvy, dvz
             # resample the image
             log.info('Interpolating the image')
             if self.vol.ndim == 3:
@@ -198,20 +249,25 @@ class Unwarper(object):
                                                                 vrcsw,
                                                                 order=1)
 
-            # resample the jacobian determinant image
-            vjacdet_lps = vjacdet_lps.reshape(self.vol.shape[:3])
-            vjacdet_lpsw = ndimage.interpolation.map_coordinates(vjacdet_lps,
-                                                        vrcsw,
-                                                        order=1)
 
             # find NaN voxels, report them and set them to 0
             out[np.where(np.isnan(out))] = 0.
             out[np.where(np.isinf(out))] = 0.
-            vjacdet_lpsw[np.where(np.isnan(out))] = 0.
-            vjacdet_lpsw[np.where(np.isinf(out))] = 0.
 
+            vjacdet_lpsw = None
             # Multiply the intensity with the Jacobian det, if needed
             if not self.nojac:
+                # resample the jacobian determinant image
+                vjacdet_lps = ndimage.interpolation.map_coordinates(vjacdet_lps_grid,
+                                                                vxyz,
+                                                                order=1)
+
+                vjacdet_lpsw = ndimage.interpolation.map_coordinates(vjacdet_lps,
+                                                            vrcsw,
+                                                            order=1)
+                vjacdet_lpsw[np.where(np.isnan(out))] = 0.
+                vjacdet_lpsw[np.where(np.isinf(out))] = 0.
+
                 if out.ndim == 3:
                     out = out * vjacdet_lpsw
                 elif out.ndim == 4:
@@ -274,13 +330,20 @@ def eval_spherical_harmonics(coeffs, vendor, vxyz):
     # log.info('calculating displacements (mm) '
     #        'using spherical harmonics coeffcients...')
     if vendor == 'siemens':
+        log.info('along x...')
         bx = siemens_B(coeffs.alpha_x, coeffs.beta_x, x, y, z, R0)
+        log.info('along y...')
         by = siemens_B(coeffs.alpha_y, coeffs.beta_y, x, y, z, R0)
+        log.info('along z...')
         bz = siemens_B(coeffs.alpha_z, coeffs.beta_z, x, y, z, R0)
     else:
         # GE
+        log.info('along x...')
         bx = ge_D(coeffs.alpha_x, coeffs.beta_x, x, y, z)
+        log.info('along y...')
         by = ge_D(coeffs.alpha_y, coeffs.beta_y, x, y, z)
+        log.info('along z...')
+        bz = siemens_B(coeffs.alpha_z, coeffs.beta_z, x, y, z, R0)
         bz = ge_D(coeffs.alpha_z, coeffs.beta_z, x, y, z)
 
     return CV(bx * R0, by * R0, bz * R0), CV(x, y, z)

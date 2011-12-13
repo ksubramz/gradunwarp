@@ -34,6 +34,10 @@ def argument_parse_gradunwarp():
     p.add_argument('-w', '--warp', action='store_true', default=False)
     p.add_argument('-n', '--nojacobian', dest='nojac', action='store_true',
                   default=False)
+    p.add_argument('--fovmin', dest='fovmin')
+    p.add_argument('--fovmax', dest='fovmax')
+    p.add_argument('--numpoints', dest='numpoints')
+
     p.add_argument('--verbose', action='store_true', default=False)
     p.add_argument('--highmem', action='store_true', default=False)
 
@@ -84,6 +88,12 @@ class GradientUnwarpRunner(object):
 
         self.unwarper = Unwarper(self.vol, self.m_rcs2ras, self.args.vendor,
                             self.coeffs)
+        if hasattr(self.args, 'fovmin') and self.args.fovmin:
+            self.unwarper.fovmin = float(self.args.fovmin)
+        if hasattr(self.args, 'fovmax') and self.args.fovmax:
+            self.unwarper.fovmax = float(self.args.fovmax)
+        if hasattr(self.args, 'numpoints') and self.args.numpoints:
+            self.unwarper.numpoints = int(self.args.numpoints)
         if hasattr(self.args, 'warp') and self.args.warp:
             self.unwarper.warp = True
         if hasattr(self.args, 'nojac') and self.args.nojac:
