@@ -57,15 +57,19 @@ class Unwarper(object):
         else:
             numpoints = self.numpoints
 
+        # convert to mm
+        fovmin = fovmin * 1000.
+        fovmax = fovmax * 1000.
+        # the grid in meters. this is needed for spherical harmonics
         vec = np.linspace(fovmin, fovmax, numpoints)
         gvx, gvy, gvz = utils.meshgrid(vec, vec, vec)
         # mm
-        cf = (fovmax - fovmin) / numpoints * 1000
+        cf = (fovmax - fovmin) / numpoints
         
         # deduce the transformation from rcs to grid
-        g_rcs2xyz = np.array( [[0, cf, 0, fovmin*1000],
-                               [cf, 0, 0, fovmin*1000],
-                               [0, 0, cf, fovmin*1000],
+        g_rcs2xyz = np.array( [[0, cf, 0, fovmin],
+                               [cf, 0, 0, fovmin],
+                               [0, 0, cf, fovmin],
                                [0, 0, 0, 1]], dtype=np.float32 )
 
         # get the grid to rcs transformation also
@@ -81,7 +85,7 @@ class Unwarper(object):
         gvxyz = CV(gvx, gvy, gvz)
         _dv, _dxyz = eval_spherical_harmonics(coeffs, vendor, gvxyz)
             
-        return _dv, CV(gr, gc, gs), g_xyz2rcs
+        return CV(_dv.x, _dv.y, _dv.z), CV(gr, gc, gs), g_xyz2rcs
 
 
     def run(self):
@@ -210,13 +214,13 @@ class Unwarper(object):
 
             vrcsg = utils.transform_coordinates(vxyz, g_xyz2rcs)
             vrcsg_m = CV(vrcsg.y, vrcsg.x, vrcsg.z)
-            dvx = ndimage.interpolation.map_coordinates(grcs.y,
+            dvx = ndimage.interpolation.map_coordinates(dv.y,
                                                         vrcsg_m,
                                                         order=3)
-            dvy = ndimage.interpolation.map_coordinates(grcs.x,
+            dvy = ndimage.interpolation.map_coordinates(dv.x,
                                                         vrcsg_m,
                                                         order=3)
-            dvz = ndimage.interpolation.map_coordinates(grcs.z,
+            dvz = ndimage.interpolation.map_coordinates(dv.z,
                                                         vrcsg_m,
                                                         order=3)
             # new locations of the image voxels in XYZ ( LAI ) coords
@@ -322,7 +326,7 @@ def eval_spherical_harmonics(coeffs, vendor, vxyz):
         (optional) useful in case vxyz is scalar
     '''
     # convert radius into mm
-    R0 = coeffs.R0_m * 1000
+    R0 = coeffs.R0_m  * 1000
 
     x, y, z = vxyz
 
