@@ -15,6 +15,7 @@ import nibabel as nib
 import pdb
 import math
 import logging
+from scipy import ndimage
 
 np.seterr(all='raise')
 
@@ -171,21 +172,27 @@ class Unwarper(object):
                        y=vxyz.y + self.polarity * dv.y,
                        z=vxyz.z + self.polarity * dv.z)
 
-            print vxyzw.x[40,40,40]
-
             # if polarity is negative, the jacobian is also inversed
             if self.polarity == -1:
                 vjacdet_lps = 1. / vjacdet_lps
 
             # convert the locations got into RCS indices
+            test = np.array([[0., 0., .25, 33.375],
+                             [.25, 0, 0, 33.375],
+                             [0, .25, 0, 33.375],
+                             [0,0,0,1]])
             vrcsw = utils.transform_coordinates(vxyzw,
-                                                np.linalg.inv(m_rcs2lai))
+                                                test)
+            #                                    np.linalg.inv(m_rcs2lai))
 
             # resample the image
             log.info('Interpolating the image')
             if self.vol.ndim == 3:
                 # note that out is always in float32
-                out = utils.interp3(self.vol, vrcsw.y, vrcsw.x, vrcsw.z)
+                # out = utils.interp3(self.vol, vrcsw.z, vrcsw.x, vrcsw.y)
+                out = ndimage.interpolation.map_coordinates(self.vol,
+                                                            [vrcsw.x, vrcsw.y, vrcsw.z],
+                                                            order=1)
                 #out = out.reshape(self.vol.shape)
             if self.vol.ndim == 4:
                 nframes = self.vol.shape[3]
