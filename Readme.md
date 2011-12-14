@@ -102,6 +102,7 @@ Some thoughts:
 >  -  Run gradunwarp in a computer with more memory
 >  -  Use —numpoints to reduce the grid size. —fovmin and —fovmax can
       be used to move the grid close to your data extents.
+>  -  Use non-compressed source volumes. i.e. .mgh and .nii instead of .mgz/.nii.gz
 >  -  Recent versions of Python, numpy and scipy
 
 ## Future Work
