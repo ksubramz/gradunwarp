@@ -113,6 +113,7 @@ Future Work
  * support for GE processing (near future)
  * better support for high res volumes (process it slice-by-slice?)
  * report statistics 
+ * explore removal of Numpy-devel dependency if the speedup is not that significant
 
 
 License
