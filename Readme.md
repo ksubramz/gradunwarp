@@ -9,11 +9,12 @@ unwarp Siemens data (and GE support very soon).
 ### Prerequisites
 
 gradunwarp needs
-  ~ -   Python (>2.7)
-    -   Numpy (preferably, the latest)
-    -   Scipy (preferably, the latest)
-    -   Numpy devel package (to compile external modules written in C)
-    -   nibabel (latest trunk, which has the MGH support)
+
+> -   Python (>2.7)
+> -   Numpy (preferably, the latest)
+> -   Scipy (preferably, the latest)
+> -   Numpy devel package (to compile external modules written in C)
+> -   nibabel (latest trunk, which has the MGH support)
 
 The installation of these in Ubuntu is as simple as
 
