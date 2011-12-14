@@ -17,6 +17,7 @@ gradunwarp needs
  * Numpy (preferably, the latest)
  * Scipy (preferably, the latest)
  * Numpy devel package (to compile external modules written in C)
+ * nibabel (latest trunk, which has the MGH support)
 
 The installation of these in Ubuntu is as simple as
 ::
@@ -26,7 +27,13 @@ The installation of these in Ubuntu is as simple as
 
 Install
 -------
-Once the tarball is downloaded, it is extracted and after changing directory to that path,
+For convenience both the gradunwarp and nibabel tarballs can be downloaded from
+
+https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.0_alpha.tar.gz
+
+https://github.com/downloads/ksubramz/gradunwarp/nibabel-1.2.0.dev.tar.gz
+
+They are extracted and the following step is the same for gradunwarp and nibabel installation. First, change to the respective directory. Then,
 ::
 
   sudo python setup.py install
