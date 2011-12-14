@@ -96,11 +96,12 @@ spherical harmonics grid. (It typically takes 4 to 5 minutes for the
 entire unwarping)
 
 Some thoughts:
-  ~ -   Use lower resolution volumes if possible
-    -   Run gradunwarp in a computer with more memory
-    -   Use —numpoints to reduce the grid size. —fovmin and —fovmax can
-        be used to move the grid close to your data extents.
-    -   Recent versions of Python, numpy and scipy
+
+>  -  Use lower resolution volumes if possible
+>  -  Run gradunwarp in a computer with more memory
+>  -  Use —numpoints to reduce the grid size. —fovmin and —fovmax can
+      be used to move the grid close to your data extents.
+>  -  Recent versions of Python, numpy and scipy
 
 ## Future Work
 
