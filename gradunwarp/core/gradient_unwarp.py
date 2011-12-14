@@ -45,6 +45,8 @@ def argument_parse_gradunwarp():
                   help='the maximum extent of harmonics evaluation grid in meters')
     p.add_argument('--numpoints', dest='numpoints',
                    help='number of grid points in each direction')
+    p.add_argument('--interp_order', dest='order',
+                   help='the order of interpolation(1..4) where 1 is linear - default')
 
     p.add_argument('--verbose', action='store_true', default=False)
 
@@ -105,6 +107,8 @@ class GradientUnwarpRunner(object):
             self.unwarper.warp = True
         if hasattr(self.args, 'nojac') and self.args.nojac:
             self.unwarper.nojac = True
+        if hasattr(self.args, 'order') and self.args.order:
+            self.unwarper.order = int(self.args.order)
         self.unwarper.run()
 
     def write(self):

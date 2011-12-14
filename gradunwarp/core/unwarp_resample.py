@@ -41,8 +41,14 @@ class Unwarper(object):
         self.fovmax = None
         self.numpoints = None
 
+        # interpolation order ( 1 = linear)
+        self.order = 1
+
     def eval_spharm_grid(self, vendor, coeffs):
-        ''' returns dv'''
+        ''' 
+        We evaluate the spherical harmonics on a less sampled grid.
+        This is a spacetime vs accuracy tradeoff.
+        '''
         # init the grid first
         if not self.fovmin:
             fovmin = globals.siemens_fovmin
@@ -81,7 +87,7 @@ class Unwarper(object):
 
         log.info('Evaluating spherical harmonics')
         log.info('on a ' + str(numpoints) + '^3 grid')
-        log.info('with extents ' + str(fovmin) + ' to ' + str(fovmax))
+        log.info('with extents ' + str(fovmin) + 'mm to ' + str(fovmax) + 'mm')
         gvxyz = CV(gvx, gvy, gvz)
         _dv, _dxyz = eval_spherical_harmonics(coeffs, vendor, gvxyz)
             
@@ -106,7 +112,6 @@ class Unwarper(object):
 
         # indices of image volume
         nr, nc, ns = self.vol.shape[:3]
-        vr, vc = utils.meshgrid(np.arange(nr), np.arange(nc))
         vc3, vr3, vs3 = utils.meshgrid(np.arange(nr), np.arange(nc), np.arange(ns), dtype=np.float32)
         vrcs = CV(x=vr3, y=vc3, z=vs3)
         vxyz = utils.transform_coordinates(vrcs, m_rcs2lai)
@@ -166,8 +171,9 @@ class Unwarper(object):
             '''
 
         print
-        #dv = CV(dvx, dvy, dvz)
+        # Evaluate spherical harmonics on a smaller grid 
         dv, grcs, g_xyz2rcs = self.eval_spharm_grid(self.vendor, self.coeffs)
+        # do the nonlinear unwarp
         self.out, self.vjacmult_lps = self.non_linear_unwarp(vxyz, grcs, dv, dxyz,
                                                                  m_rcs2lai, g_xyz2rcs)
 
@@ -206,23 +212,21 @@ class Unwarper(object):
         # displacements and coordinates in LPS orientation
         # (right handed form of p.o.v of patient )
         if self.vendor == 'siemens':
-            if dxyz == 0:
-                vjacdet_lps = 1
-            else:
-                # vjacdet_lps = eval_siemens_jacobian_mult(dv, dxyz)
-                pass
 
+            log.info('Interpolating the spherical harmonics grid')
             vrcsg = utils.transform_coordinates(vxyz, g_xyz2rcs)
             vrcsg_m = CV(vrcsg.y, vrcsg.x, vrcsg.z)
             dvx = ndimage.interpolation.map_coordinates(dv.y,
                                                         vrcsg_m,
-                                                        order=4)
+                                                        order=self.order)
             dvy = ndimage.interpolation.map_coordinates(dv.x,
                                                         vrcsg_m,
-                                                        order=4)
+                                                        order=self.order)
             dvz = ndimage.interpolation.map_coordinates(dv.z,
                                                         vrcsg_m,
-                                                        order=4)
+                                                        order=self.order)
+
+            log.info('Calculating the new locations of voxels')
             # new locations of the image voxels in XYZ ( LAI ) coords
             vxyzw = CV(x=vxyz.x + self.polarity * dvx,
                        y=vxyz.y + self.polarity * dvy,
@@ -232,42 +236,49 @@ class Unwarper(object):
             if self.polarity == -1:
                 vjacdet_lps = 1. / vjacdet_lps
 
+            # hopefully, free memory
+            del dvx, dvy, dvz, vxyz
             # convert the locations got into RCS indices
             vrcsw = utils.transform_coordinates(vxyzw,
                                                 np.linalg.inv(m_rcs2lai))
 
             # hopefully, free memory
-            del vxyzw, dvx, dvy, dvz
+            del vxyzw
             # resample the image
             log.info('Interpolating the image')
             if self.vol.ndim == 3:
-                # note that out is always in float32
                 #out = utils.interp3(self.vol, vrcsw.x, vrcsw.x, vrcsw.z)
                 out = ndimage.interpolation.map_coordinates(self.vol,
                                                             vrcsw,
-                                                            order=1)
+                                                            order=self.order)
             if self.vol.ndim == 4:
                 nframes = self.vol.shape[3]
                 out = np.zeros(self.vol.shape)
                 for f in nframes:
                     _out = ndimage.interpolation.map_coordinates(self.vol[..., f],
                                                                 vrcsw,
-                                                                order=1)
+                                                                order=self.order)
 
-
-            # find NaN voxels, report them and set them to 0
+            # find NaN voxels, and set them to 0
             out[np.where(np.isnan(out))] = 0.
             out[np.where(np.isinf(out))] = 0.
 
             vjacdet_lpsw = None
             # Multiply the intensity with the Jacobian det, if needed
             if not self.nojac:
+                log.info('Evaluating the Jacobian multiplier')
+                if dxyz == 0:
+                    vjacdet_lps = 1
+                else:
+                    vjacdet_lps = eval_siemens_jacobian_mult(dv, dxyz)
+                log.info('Interpolating the Jacobian multiplier')
                 vjacdet_lpsw = ndimage.interpolation.map_coordinates(vjacdet_lps,
                                                             vrcsg_m,
-                                                            order=1)
+                                                            order=self.order)
                 vjacdet_lpsw[np.where(np.isnan(out))] = 0.
                 vjacdet_lpsw[np.where(np.isinf(out))] = 0.
 
+                log.info('Performing Jacobian multiplication')
                 if out.ndim == 3:
                     out = out * vjacdet_lpsw
                 elif out.ndim == 4:
@@ -276,7 +287,6 @@ class Unwarper(object):
 
             # return image and the jacobian
             return out, vjacdet_lpsw
-            self.m_rcs2lai = m_rcs2lai
 
         if self.vendor == 'ge':
             pass  # for now
