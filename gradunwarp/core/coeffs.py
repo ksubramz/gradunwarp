@@ -70,7 +70,6 @@ def get_siemens_coef(cfile):
     # allegra is slightly different
     if cfile.startswith('allegra'):
         coef_array_sz = 15
-    ax = ay = az = bx = by = bz = np.zeros((coef_array_sz, coef_array_sz))
     ax = np.zeros((coef_array_sz, coef_array_sz))
     ay = np.zeros((coef_array_sz, coef_array_sz))
     az = np.zeros((coef_array_sz, coef_array_sz))

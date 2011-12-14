@@ -6,16 +6,16 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 import numpy as np
 import sys
+import pdb
+import math
+import logging
+from scipy import ndimage
 import utils
 from utils import CoordsVector as CV
 from utils import factorial
 import globals
 from globals import siemens_max_det
 import nibabel as nib
-import pdb
-import math
-import logging
-from scipy import ndimage
 
 #np.seterr(all='raise')
 
@@ -207,22 +207,22 @@ class Unwarper(object):
         # (right handed form of p.o.v of patient )
         if self.vendor == 'siemens':
             if dxyz == 0:
-                vjacdet_lps_grid = 1
+                vjacdet_lps = 1
             else:
-                # vjacdet_lps_grid = eval_siemens_jacobian_mult(dv, dxyz)
+                # vjacdet_lps = eval_siemens_jacobian_mult(dv, dxyz)
                 pass
 
             vrcsg = utils.transform_coordinates(vxyz, g_xyz2rcs)
             vrcsg_m = CV(vrcsg.y, vrcsg.x, vrcsg.z)
             dvx = ndimage.interpolation.map_coordinates(dv.y,
                                                         vrcsg_m,
-                                                        order=3)
+                                                        order=4)
             dvy = ndimage.interpolation.map_coordinates(dv.x,
                                                         vrcsg_m,
-                                                        order=3)
+                                                        order=4)
             dvz = ndimage.interpolation.map_coordinates(dv.z,
                                                         vrcsg_m,
-                                                        order=3)
+                                                        order=4)
             # new locations of the image voxels in XYZ ( LAI ) coords
             vxyzw = CV(x=vxyz.x + self.polarity * dvx,
                        y=vxyz.y + self.polarity * dvy,
@@ -236,12 +236,13 @@ class Unwarper(object):
             vrcsw = utils.transform_coordinates(vxyzw,
                                                 np.linalg.inv(m_rcs2lai))
 
+            # hopefully, free memory
             del vxyzw, dvx, dvy, dvz
             # resample the image
             log.info('Interpolating the image')
             if self.vol.ndim == 3:
                 # note that out is always in float32
-                # out = utils.interp3(self.vol, vrcsw.z, vrcsw.x, vrcsw.y)
+                #out = utils.interp3(self.vol, vrcsw.x, vrcsw.x, vrcsw.z)
                 out = ndimage.interpolation.map_coordinates(self.vol,
                                                             vrcsw,
                                                             order=1)
@@ -261,13 +262,8 @@ class Unwarper(object):
             vjacdet_lpsw = None
             # Multiply the intensity with the Jacobian det, if needed
             if not self.nojac:
-                # resample the jacobian determinant image
-                vjacdet_lps = ndimage.interpolation.map_coordinates(vjacdet_lps_grid,
-                                                                vxyz,
-                                                                order=1)
-
                 vjacdet_lpsw = ndimage.interpolation.map_coordinates(vjacdet_lps,
-                                                            vrcsw,
+                                                            vrcsg_m,
                                                             order=1)
                 vjacdet_lpsw[np.where(np.isnan(out))] = 0.
                 vjacdet_lpsw[np.where(np.isinf(out))] = 0.

@@ -8,7 +8,9 @@ import logging
 
 VERSION = '2.0.0alpha'
 
-usage = 'foo'
+usage = '''
+gradient_unwarp infile outfile manufacturer -g <coefficient file> [optional arguments]
+'''
 
 
 # SIEMENS stuff

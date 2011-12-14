@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the gradunwarp package for the
@@ -7,10 +8,8 @@
 import argparse as arg
 import os
 import logging
-import globals
-import coeffs
-import utils
-from unwarp_resample import Unwarper
+from gradunwarp.core import (globals, coeffs, utils)
+from gradunwarp.core.unwarp_resample import Unwarper
 
 log = globals.get_logger()
 
@@ -22,24 +21,32 @@ def argument_parse_gradunwarp():
     p = arg.ArgumentParser(version=globals.VERSION, usage=globals.usage)
 
     # required arguments
-    p.add_argument('infile', action='store')
-    p.add_argument('outfile', action='store')
-    p.add_argument('vendor', action='store', choices=['siemens', 'ge'])
+    p.add_argument('infile', action='store',
+                  help='The input warped file (nifti or mgh)')
+    p.add_argument('outfile', action='store',
+                  help='The output unwarped file (extension should be .nii/.nii.gz/.mgh/.mgz)')
+    p.add_argument('vendor', action='store', choices=['siemens', 'ge'], 
+                  help='vendor (either "ge" or "siemens" for now)')
 
     coef_grp = p.add_mutually_exclusive_group(required=True)
-    coef_grp.add_argument('-g', '--gradfile', dest='gradfile')
-    coef_grp.add_argument('-c', '--coeffile', dest='coeffile')
+    coef_grp.add_argument('-g', '--gradfile', dest='gradfile',
+                         help='The .grad coefficient file')
+    coef_grp.add_argument('-c', '--coeffile', dest='coeffile',
+                         help='The .coef coefficient file')
 
     # optional arguments
-    p.add_argument('-w', '--warp', action='store_true', default=False)
+    p.add_argument('-w', '--warp', action='store_true', default=False,
+                  help='warp a volume (as opposed to unwarping)')
     p.add_argument('-n', '--nojacobian', dest='nojac', action='store_true',
-                  default=False)
-    p.add_argument('--fovmin', dest='fovmin')
-    p.add_argument('--fovmax', dest='fovmax')
-    p.add_argument('--numpoints', dest='numpoints')
+                  default=False, help='Do not perform Jacobian intensity correction')
+    p.add_argument('--fovmin', dest='fovmin',
+                  help='the minimum extent of harmonics evaluation grid in meters')
+    p.add_argument('--fovmax', dest='fovmax',
+                  help='the maximum extent of harmonics evaluation grid in meters')
+    p.add_argument('--numpoints', dest='numpoints',
+                   help='number of grid points in each direction')
 
     p.add_argument('--verbose', action='store_true', default=False)
-    p.add_argument('--highmem', action='store_true', default=False)
 
     args = p.parse_args()
 

@@ -264,6 +264,7 @@ def interp3(vol, R, C, S):
         raise ImportError('The interp3 C extension module is missing.' \
                            ' Fallback interp3 code not yet implemented.')
     vol = vol.astype(np.float32)
+    vol = np.ascontiguousarray(vol)
     R = R.astype(np.float32)
     C = C.astype(np.float32)
     S = S.astype(np.float32)
