@@ -16,6 +16,12 @@ gradunwarp needs
 > -   Numpy devel package (to compile external modules written in C)
 > -   nibabel (latest trunk, which has the MGH support)
 
+requirements for nibabel. 
+
+> - PyDICOM 0.9.5 or greater (for DICOM support)
+> - nose 0.11 or greater (to run the tests)
+> - sphinx (to build the documentation)
+
 The installation of these in Ubuntu is as simple as
 
     sudo apt-get install python-numpy
@@ -40,8 +46,8 @@ case, you can use the `--prefix` switch of setup.py install.
 
     python setup.py install --prefix=/home/foo/
 
-In that case, make sure your PATH has `/home/foo/bin` and make sure the
-PYTHONPATH has `/home/foo/bin/lib/python-2.7/site-packages/`
+In that case, make sure your `PATH` has `/home/foo/bin` and make sure the
+`PYTHONPATH` has `/home/foo/bin/lib/python-2.7/site-packages/`
 
 ## Usage
 
