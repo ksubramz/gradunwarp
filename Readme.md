@@ -92,7 +92,7 @@ These two options are mutually exclusive.
 gradunwarp tends to use quite a bit of memory because of the intense
 spherical harmonics calculation and interpolations performed multiple
 times. For instance, it uses almost 85% memory of a 2GB memory 2.2GHz
-DualCore system to performing unwarping of a 256^3 volume with 40^3
+DualCore system to perform unwarping of a 256^3 volume with 40^3
 spherical harmonics grid. (It typically takes 4 to 5 minutes for the
 entire unwarping)
 
