@@ -9,7 +9,7 @@ unwarp Siemens data (and GE support very soon).
 ### Prerequisites
 
 gradunwarp needs
-  ~ -   Python (\>2.7)
+  ~ -   Python (>2.7)
     -   Numpy (preferably, the latest)
     -   Scipy (preferably, the latest)
     -   Numpy devel package (to compile external modules written in C)
@@ -25,7 +25,7 @@ The installation of these in Ubuntu is as simple as
 For convenience both the gradunwarp and nibabel tarballs can be
 downloaded from
 
-[https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.0\_alpha.tar.gz][]
+[https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.0_alpha.tar.gz][]
 
 [https://github.com/downloads/ksubramz/gradunwarp/nibabel-1.2.0.dev.tar.gz][]
 
@@ -91,7 +91,7 @@ These two options are mutually exclusive.
 gradunwarp tends to use quite a bit of memory because of the intense
 spherical harmonics calculation and interpolations performed multiple
 times. For instance, it uses almost 85% memory of a 2GB memory 2.2GHz
-DualCore system to performing unwarping of a 256\^3 volume with 40\^3
+DualCore system to performing unwarping of a 256^3 volume with 40^3
 spherical harmonics grid. (It typically takes 4 to 5 minutes for the
 entire unwarping)
 
@@ -123,7 +123,7 @@ as well.
 > -   Karl Helmer - Project Incharge
 > -   Nibabel team
 
-  [https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.0\_alpha.tar.gz]:
+  [https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.0_alpha.tar.gz]:
     https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.0_alpha.tar.gz
   [https://github.com/downloads/ksubramz/gradunwarp/nibabel-1.2.0.dev.tar.gz]:
     https://github.com/downloads/ksubramz/gradunwarp/nibabel-1.2.0.dev.tar.gz
