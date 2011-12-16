@@ -136,7 +136,7 @@ class Unwarper(object):
         # through rotation and scaling, where any mirror
         # will impose a negation
         ones = CV(1., 1., 1.)
-        dxyz = utils.transform_coordinates(ones, r_rcs2lai)
+        dxyz = utils.transform_coordinates_old(ones, r_rcs2lai)
 
         # # convert image vol coordinates from RAS to LAI
         # vxyz = utils.transform_coordinates(vrcs, m_rcs2lai)
@@ -216,14 +216,18 @@ class Unwarper(object):
             log.info('Interpolating the spherical harmonics grid')
             vrcsg = utils.transform_coordinates(vxyz, g_xyz2rcs)
             vrcsg_m = CV(vrcsg.y, vrcsg.x, vrcsg.z)
+            del vrcsg
             dvx = ndimage.interpolation.map_coordinates(dv.y,
                                                         vrcsg_m,
+                                                        output=np.float32,
                                                         order=self.order)
             dvy = ndimage.interpolation.map_coordinates(dv.x,
                                                         vrcsg_m,
+                                                        output=np.float32,
                                                         order=self.order)
             dvz = ndimage.interpolation.map_coordinates(dv.z,
                                                         vrcsg_m,
+                                                        output=np.float32,
                                                         order=self.order)
 
             log.info('Calculating the new locations of voxels')
@@ -232,12 +236,13 @@ class Unwarper(object):
                        y=vxyz.y + self.polarity * dvy,
                        z=vxyz.z + self.polarity * dvz)
 
+            # hopefully, free memory
+            del dvx, dvy, dvz, vxyz
+
             # if polarity is negative, the jacobian is also inversed
             if self.polarity == -1:
                 vjacdet_lps = 1. / vjacdet_lps
 
-            # hopefully, free memory
-            del dvx, dvy, dvz, vxyz
             # convert the locations got into RCS indices
             vrcsw = utils.transform_coordinates(vxyzw,
                                                 np.linalg.inv(m_rcs2lai))
@@ -250,6 +255,7 @@ class Unwarper(object):
                 #out = utils.interp3(self.vol, vrcsw.x, vrcsw.x, vrcsw.z)
                 out = ndimage.interpolation.map_coordinates(self.vol,
                                                             vrcsw,
+                                                            output=np.float32,
                                                             order=self.order)
             if self.vol.ndim == 4:
                 nframes = self.vol.shape[3]
@@ -257,6 +263,7 @@ class Unwarper(object):
                 for f in nframes:
                     _out = ndimage.interpolation.map_coordinates(self.vol[..., f],
                                                                 vrcsw,
+                                                                output=np.float32,
                                                                 order=self.order)
 
             # find NaN voxels, and set them to 0
@@ -274,6 +281,7 @@ class Unwarper(object):
                 log.info('Interpolating the Jacobian multiplier')
                 vjacdet_lpsw = ndimage.interpolation.map_coordinates(vjacdet_lps,
                                                             vrcsg_m,
+                                                            output=np.float32,
                                                             order=self.order)
                 vjacdet_lpsw[np.where(np.isnan(out))] = 0.
                 vjacdet_lpsw[np.where(np.isinf(out))] = 0.

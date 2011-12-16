@@ -18,7 +18,10 @@ from math import sqrt, cos, pi
 CoordsVector = namedtuple('CoordsVector', 'x, y, z')
 
 
-def transform_coordinates(A, M):
+# this method is deprecated because it's slow and my suspicion that
+# the matrix expressions create unnecessary temp matrices which 
+# are costly for huge matrices
+def transform_coordinates_old(A, M):
     ''' 4x4 matrix M operates on orthogonal coordinates arrays
     A1, A2, A3 to give B1, B2, B3
     '''
@@ -28,6 +31,26 @@ def transform_coordinates(A, M):
     B1 = A1 * M[0, 0] + A2 * M[0, 1] + A3 * M[0, 2] + M[0, 3]
     B2 = A1 * M[1, 0] + A2 * M[1, 1] + A3 * M[1, 2] + M[1, 3]
     B3 = A1 * M[2, 0] + A2 * M[2, 1] + A3 * M[2, 2] + M[2, 3]
+    return CoordsVector(B1, B2, B3)
+
+def transform_coordinates(A, M):
+    ''' 4x4 matrix M operates on orthogonal coordinates arrays
+    A1, A2, A3 to give B1, B2, B3
+    '''
+    A1 = A.x
+    A2 = A.y
+    A3 = A.z
+    A1 = A1.astype(np.float32)
+    A2 = A2.astype(np.float32)
+    A3 = A3.astype(np.float32)
+    M = M.astype(np.float32)
+    try:
+        from transform_coordinates_ext import _transform_coordinates
+    except ImportError:
+        raise ImportError('The transform_coordinates C extension module is missing.' \
+                           ' Fallback code not yet implemented.')
+
+    B1, B2, B3 = _transform_coordinates(A1, A2, A3, M)
     return CoordsVector(B1, B2, B3)
 
 

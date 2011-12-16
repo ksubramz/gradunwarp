@@ -12,6 +12,7 @@ mods = ['gradunwarp.core.coeffs', 'gradunwarp.core.globals',
 
 dats = [('gradunwarp/core/', ['gradunwarp/core/interp3_ext.c']),
         ('gradunwarp/core/', ['gradunwarp/core/legendre_ext.c']),
+        ('gradunwarp/core/', ['gradunwarp/core/transform_coordinates_ext.c']),
        ]
 
 # to build the C extension interp3_ext.c
@@ -19,10 +20,15 @@ ext1 = Extension('gradunwarp.core.interp3_ext',
                  include_dirs = get_numpy_include_dirs(),
                  sources = ['gradunwarp/core/interp3_ext.c'],
                  extra_compile_args=['-O3'])
-# to build the C extension interp3_ext.c
+# to build the C extension legendre_ext.c
 ext2 = Extension('gradunwarp.core.legendre_ext',
                  include_dirs = get_numpy_include_dirs(),
                  sources = ['gradunwarp/core/legendre_ext.c'],
+                 extra_compile_args=['-O3'])
+# to build the C extension transform_coordinates_ext.c
+ext3 = Extension('gradunwarp.core.transform_coordinates_ext',
+                 include_dirs = get_numpy_include_dirs(),
+                 sources = ['gradunwarp/core/transform_coordinates_ext.c'],
                  extra_compile_args=['-O3'])
 
 scripts_cmd = ['gradunwarp/core/gradient_unwarp.py',]
@@ -39,7 +45,7 @@ setup(name='gradunwarp',
       description = 'Gradient Unwarping Package for Python/Numpy',
       author = 'Krish Subramaniam',
       py_modules  = mods,
-      ext_modules = [ext1, ext2],
+      ext_modules = [ext1, ext2, ext3],
       scripts = scripts_cmd,
       configuration=configuration,
      )
