@@ -68,7 +68,26 @@ static PyObject *transform_coordinates(PyObject *self, PyObject *args)
     itr_xm = (PyArrayIterObject *) PyArray_IterNew(Xm);
     itr_ym = (PyArrayIterObject *) PyArray_IterNew(Ym);
     itr_zm = (PyArrayIterObject *) PyArray_IterNew(Zm);
-    m = (float *)PyArray_DATA(mat);
+    /*m = (float *)PyArray_DATA(mat);
+    printf("%f %f %f %f\n", m[0], m[1], m[2], m[3]);
+    printf("%f %f %f %f\n", m[4], m[5], m[6], m[7]);
+    printf("%f %f %f %f\n", m[8], m[9], m[10], m[11]);
+    */
+    float *m00, *m01, *m02, *m03;
+    float *m10, *m11, *m12, *m13;
+    float *m20, *m21, *m22, *m23;
+    m00 = (float *)PyArray_GETPTR2(mat, 0, 0);
+    m01 = (float *)PyArray_GETPTR2(mat, 0, 1);
+    m02 = (float *)PyArray_GETPTR2(mat, 0, 2);
+    m03 = (float *)PyArray_GETPTR2(mat, 0, 3);
+    m10 = (float *)PyArray_GETPTR2(mat, 1, 0);
+    m11 = (float *)PyArray_GETPTR2(mat, 1, 1);
+    m12 = (float *)PyArray_GETPTR2(mat, 1, 2);
+    m13 = (float *)PyArray_GETPTR2(mat, 1, 3);
+    m20 = (float *)PyArray_GETPTR2(mat, 2, 0);
+    m21 = (float *)PyArray_GETPTR2(mat, 2, 1);
+    m22 = (float *)PyArray_GETPTR2(mat, 2, 2);
+    m23 = (float *)PyArray_GETPTR2(mat, 2, 3);
 
     // start the iteration
     while(PyArray_ITER_NOTDONE(itr_x))
@@ -81,9 +100,9 @@ static PyObject *transform_coordinates(PyObject *self, PyObject *args)
         zm = (float *) PyArray_ITER_DATA(itr_zm);
 
         // transform coordinates
-        *xm = *x * m[0] + *y * m[1] + *z * m[2] + m[3];
-        *ym = *x * m[4] + *y * m[5] + *z * m[6] + m[7];
-        *zm = *x * m[8] + *y * m[9] + *z * m[10] + m[11];
+        *xm = *x * *m00 + *y * *m01 + *z * *m02 + *m03;
+        *ym = *x * *m10 + *y * *m11 + *z * *m12 + *m13;
+        *zm = *x * *m20 + *y * *m21 + *z * *m22 + *m23;
 
 		PyArray_ITER_NEXT(itr_x);
 		PyArray_ITER_NEXT(itr_y);
