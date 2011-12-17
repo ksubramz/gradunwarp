@@ -7,6 +7,7 @@
 import numpy as np
 import sys
 import pdb
+import gc
 import math
 import logging
 from scipy import ndimage
@@ -172,18 +173,24 @@ class Unwarper(object):
             the jacobian multiplier (determinant)
         '''
         log.info('Evaluating the jacobian multiplier')
+        nr, nc, ns = self.vol.shape[:3]
         if not self.nojac:
+            jim2 = np.zeros((nr, nc), dtype=np.float32)
+            vjacdet_lpsw = np.zeros((nr, nc), dtype=np.float32)
             if dxyz == 0:
                 vjacdet_lps = 1
             else:
                 vjacdet_lps = eval_siemens_jacobian_mult(dv, dxyz)
 
-        nr, nc, ns = self.vol.shape[:3]
-        out = np.zeros((nr, nc, ns))
-        vjacout = np.zeros((nr, nc, ns))
-        im2 = np.zeros((nr, nc))
+        # essentially pre-allocating everything 
+        out = np.zeros((nr, nc, ns), dtype=np.float32)
+        vjacout = np.zeros((nr, nc, ns), dtype=np.float32)
+        im2 = np.zeros((nr, nc), dtype=np.float32)
+        dvx = np.zeros((nr, nc), dtype=np.float32)
+        dvy = np.zeros((nr, nc), dtype=np.float32)
+        dvz = np.zeros((nr, nc), dtype=np.float32)
+        im_ = np.zeros((nr, nc), dtype=np.float32)
         # init jacobian temp image
-        jim2 = np.zeros((nr, nc))
         vr, vc = utils.meshgrid(np.arange(nr), np.arange(nc))
 
         log.info('Unwarping slice by slice')
@@ -195,23 +202,31 @@ class Unwarper(object):
                 print s+1,
             else:
                 print '.',
-
+                
+            # hopefully, free memory
+            gc.collect()
+            # init to 0
+            dvx.fill(0.)
+            dvy.fill(0.)
+            dvz.fill(0.)
+            im_.fill(0.)
+            
             vs = np.ones(vr.shape) * s
             vrcs = CV(vr, vc, vs)
             vxyz = utils.transform_coordinates(vrcs, m_rcs2lai_nohalf)
             vrcsg = utils.transform_coordinates(vxyz, g_xyz2rcs)
-            dvx = ndimage.interpolation.map_coordinates(dv.x,
-                                                        vrcsg,
-                                                        output=np.float32,
-                                                        order=self.order)
-            dvy = ndimage.interpolation.map_coordinates(dv.y,
-                                                        vrcsg,
-                                                        output=np.float32,
-                                                        order=self.order)
-            dvz = ndimage.interpolation.map_coordinates(dv.z,
-                                                        vrcsg,
-                                                        output=np.float32,
-                                                        order=self.order)
+            ndimage.interpolation.map_coordinates(dv.x,
+                                                  vrcsg,
+                                                  output=dvx,
+                                                  order=self.order)
+            ndimage.interpolation.map_coordinates(dv.y,
+                                                  vrcsg,
+                                                  output=dvy,
+                                                  order=self.order)
+            ndimage.interpolation.map_coordinates(dv.z,
+                                                  vrcsg,
+                                                  output=dvz,
+                                                  order=self.order)
             # new locations of the image voxels in XYZ ( LAI ) coords
             vxyzw = CV(x=vxyz.x + self.polarity * dvx,
                        y=vxyz.y + self.polarity * dvy,
@@ -220,35 +235,32 @@ class Unwarper(object):
             vrcsw = utils.transform_coordinates(vxyzw,
                                                 np.linalg.inv(m_rcs2lai))
 
-            # hopefully, free memory
-            del vxyzw
 
             #im_ = utils.interp3(self.vol, vrcsw.x, vrcsw.y, vrcsw.z)
-            im_ = ndimage.interpolation.map_coordinates(self.vol,
-                                                        vrcsw,
-                                                        output=np.float32,
-                                                        order=self.order)
+            ndimage.interpolation.map_coordinates(self.vol,
+                                                  vrcsw,
+                                                  output=im_,
+                                                  order=self.order)
             # find NaN voxels, and set them to 0
             im_[np.where(np.isnan(im_))] = 0.
             im_[np.where(np.isinf(im_))] = 0.
             im2[vr, vc] = im_
 
-            vjacdet_lpsw = None
             # Multiply the intensity with the Jacobian det, if needed
             if not self.nojac:
+                vjacdet_lpsw.fill(0.)
                 # if polarity is negative, the jacobian is also inversed
                 if self.polarity == -1:
                     vjacdet_lps = 1. / vjacdet_lps
 
-                vjacdet_lpsw = ndimage.interpolation.map_coordinates(vjacdet_lps,
-                                                            vrcsg,
-                                                            output=np.float32,
-                                                            order=self.order)
+                ndimage.interpolation.map_coordinates(vjacdet_lps,
+                                                      vrcsg,
+                                                      output=vjacdet_lpsw,
+                                                      order=self.order)
                 vjacdet_lpsw[np.where(np.isnan(vjacdet_lpsw))] = 0.
                 vjacdet_lpsw[np.where(np.isinf(vjacdet_lpsw))] = 0.
-                jim2 = np.zeros_like(vjacdet_lpsw)
-                im2 = im2 * jim2
-                vjacout[..., s] = jim2
+                im2 = im2 * vjacdet_lpsw
+                vjacout[..., s] = vjacdet_lpsw
 
             out[..., s] = im2
 
@@ -261,7 +273,7 @@ class Unwarper(object):
         if outfile.endswith('.nii') or outfile.endswith('.nii.gz'):
             img = nib.Nifti1Image(self.out, self.m_rcs2ras)
         if outfile.endswith('.mgh') or outfile.endswith('.mgz'):
-            self.out = self.out.astype(self.vol.dtype)
+            #self.out = self.out.astype(self.vol.dtype)
             img = nib.MGHImage(self.out, self.m_rcs2ras)
         nib.save(img, outfile)
 
