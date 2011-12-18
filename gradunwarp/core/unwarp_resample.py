@@ -249,6 +249,7 @@ class Unwarper(object):
             # Multiply the intensity with the Jacobian det, if needed
             if not self.nojac:
                 vjacdet_lpsw.fill(0.)
+                jim2.fill(0.)
                 # if polarity is negative, the jacobian is also inversed
                 if self.polarity == -1:
                     vjacdet_lps = 1. / vjacdet_lps
@@ -259,8 +260,9 @@ class Unwarper(object):
                                                       order=self.order)
                 vjacdet_lpsw[np.where(np.isnan(vjacdet_lpsw))] = 0.
                 vjacdet_lpsw[np.where(np.isinf(vjacdet_lpsw))] = 0.
-                im2 = im2 * vjacdet_lpsw
-                vjacout[..., s] = vjacdet_lpsw
+                jim2[vr, vc] = vjacdet_lpsw
+                im2 = im2 * jim2
+                vjacout[..., s] = jim2
 
             out[..., s] = im2
 
