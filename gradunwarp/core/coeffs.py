@@ -141,6 +141,8 @@ def grad_file_parse(gfile, txt_var_map):
     while 1:
         lindex =  line.find('(')
         rindex =  line.find(')')
+        if lindex == -1 and rindex == -1:
+            break
         arrindex = line[lindex+1:rindex]
         xs, ys = arrindex.split(',')
         x = int(xs) 
