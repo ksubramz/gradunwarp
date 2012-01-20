@@ -32,7 +32,7 @@ The installation of these in Ubuntu is as simple as
 For convenience both the gradunwarp and nibabel tarballs can be
 downloaded from
 
-[https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.1_slice_alpha.tar.gz][]
+https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.1_slice_alpha.tar.gz
 
 [https://github.com/downloads/ksubramz/gradunwarp/nibabel-1.2.0.dev.tar.gz][]
 
