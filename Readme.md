@@ -32,7 +32,7 @@ The installation of these in Ubuntu is as simple as
 For convenience both the gradunwarp and nibabel tarballs can be
 downloaded from
 
-[https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.0_alpha.tar.gz][]
+[https://github.com/downloads/ksubramz/gradunwarp/gradunwarp-2.1_slice_alpha.tar.gz][]
 
 [https://github.com/downloads/ksubramz/gradunwarp/nibabel-1.2.0.dev.tar.gz][]
 
@@ -118,6 +118,14 @@ Some thoughts:
 > -   report statistics
 > -   explore removal of Numpy-devel dependency if the speedup is not
 >     that significant
+
+## Release Notes
+
+gradunwarp-2.1_slice_alpha.tar.gz
+---------------------------------
+> - slice by slice processing
+> - x-y flip bug fix
+> - force 32-bit output in 64-bit systems
 
 ## License
 
