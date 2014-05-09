@@ -1,3 +1,5 @@
+NOTE: This project is no longer actively maintained.
+
 # gradunwarp
 
 gradunwarp is a Python/Numpy package used to unwarp the distorted
